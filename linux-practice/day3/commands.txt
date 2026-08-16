@@ -1,0 +1,4 @@
+pwd - shows current directory
+ls - lists files and directories
+mkdir - creates a directory
+touch - creates an empty file

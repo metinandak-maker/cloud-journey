@@ -1,0 +1,2 @@
+Metin 90 - Day 3 Linux Practice
+Today I practiced Linux file and directory commands.
