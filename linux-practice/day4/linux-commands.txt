@@ -1,0 +1,3 @@
+Metin 90 - Day 4 Linux Commands
+cat = display file contents
+ls = list files and directories

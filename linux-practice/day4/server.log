@@ -1,0 +1,5 @@
+INFO Server started
+INFO User connected
+WARNING High memory usage
+ERROR Database connection failed
+INFO Connection restored
