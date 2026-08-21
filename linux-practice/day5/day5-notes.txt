@@ -1,0 +1,21 @@
+Metin 90 - Day 5
+
+Linux Permissions:
+r = read = 4
+w = write = 2
+x = execute = 1
+
+644 = rw-r--r--
+600 = rw-------
+700 = rwx------
+755 = rwxr-xr-x
+
+chmod = change permissions
+chown = change owner
+sudo = run a command with elevated privileges
+
+Processes:
+ps = show processes
+PID = Process ID
+PPID = Parent Process ID
+kill PID = send a termination signal to a process
