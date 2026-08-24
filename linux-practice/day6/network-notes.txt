@@ -1,0 +1,6 @@
+ip=cihazin ag uzerindeki adresi
+gateway=cihazin kendi agindan baska aglara cikis kapisi
+dns=ip adreslerini cozumleyen sistem
+nslookup=ip adres sorgulama
+ping=bu hedefe ulasabiliyormuyum ve cevap ne kadar surede geliyor?
+tracert=bu hedefe giderken paket hangi noktalardan geciyor
