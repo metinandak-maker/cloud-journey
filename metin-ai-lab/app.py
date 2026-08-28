@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import scrolledtext
+from tkinter import scrolledtext, filedialog
 import threading
 
 from engine import run_council
@@ -44,6 +44,21 @@ def copy_final_answer():
         root.clipboard_append(last_final_answer)
         root.update()
 
+
+def save_final_answer():
+    if not last_final_answer:
+        return
+
+
+    file_path = filedialog.asksaveasfilename(
+        defaultextension=".txt",
+        filetypes=[("Text files", "*.txt")],
+        initialfile="metin_ai_lab_result.txt"
+    )
+
+    if file_path:
+        with open(file_path, "w", encoding="utf-8") as file:
+            file.write(last_final_answer)
 
 
 def show_results(council):
@@ -159,6 +174,14 @@ copy_button = tk.Button(
     width=20
 )
 copy_button.pack(pady=5)
+save_button = tk.Button(
+    root,
+    text="SAVE RESULT",
+    command=save_final_answer,
+    font=("Arial", 11, "bold"),
+    width=20
+)
+save_button.pack(pady=5)
 results = scrolledtext.ScrolledText(
     root,
     width=115,
