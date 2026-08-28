@@ -246,3 +246,64 @@ print(grok_review)
 print("\n" + "=" * 60)
 print("BRAINSTORM V2 COMPLETE")
 print("=" * 60)
+# -----------------------------
+# ROUND 3 - FINAL JUDGE
+# -----------------------------
+
+print("\n" + "=" * 60)
+print("ROUND 3: Final Council Judgment...")
+print("=" * 60)
+
+judge_prompt = f"""
+You are the FINAL JUDGE of an AI council.
+
+Original question:
+
+{question}
+
+ATLAS REVIEW:
+{atlas_review}
+
+CLAUDE REVIEW:
+{claude_review}
+
+GROK REVIEW:
+{grok_review}
+
+Your task is NOT to simply summarize the three reviews.
+
+Analyze the council debate and produce the strongest final answer.
+
+Rules:
+1. Identify where the council agrees.
+2. Resolve important disagreements using reasoning.
+3. Remove weak, duplicated, or unsupported arguments.
+4. Preserve useful minority opinions when relevant.
+5. Produce a practical and clear final recommendation.
+6. Clearly mention important uncertainty if the council cannot resolve it.
+
+Finish with a section called:
+FINAL RECOMMENDATION
+"""
+
+try:
+    judge_response = openai_client.responses.create(
+        model="gpt-5.6",
+        input=judge_prompt
+    )
+
+    final_answer = judge_response.output_text
+
+except Exception as error:
+    final_answer = f"JUDGE ERROR: {error}"
+
+print("\n" + "=" * 60)
+print("              COUNCIL FINAL ANSWER")
+print("=" * 60)
+
+print("\n")
+print(final_answer)
+
+print("\n" + "=" * 60)
+print("BRAINSTORM V3 COMPLETE")
+print("=" * 60)
