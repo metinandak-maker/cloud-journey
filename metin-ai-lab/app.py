@@ -5,6 +5,9 @@ import threading
 from engine import run_council
 
 
+last_final_answer = ""
+
+
 def ask_council():
     question = question_box.get("1.0", tk.END).strip()
 
@@ -35,8 +38,18 @@ def run_council_thread(question):
         council
     )
 
+def copy_final_answer():
+    if last_final_answer:
+        root.clipboard_clear()
+        root.clipboard_append(last_final_answer)
+        root.update()
+
+
 
 def show_results(council):
+    global last_final_answer
+    last_final_answer = council.get("final", "")
+
     results.delete("1.0", tk.END)
 
     if "error" in council:
@@ -138,7 +151,14 @@ ask_button = tk.Button(
     width=20
 )
 ask_button.pack(pady=10)
-
+copy_button = tk.Button(
+    root,
+    text="COPY FINAL ANSWER",
+    command=copy_final_answer,
+    font=("Arial", 11, "bold"),
+    width=20
+)
+copy_button.pack(pady=5)
 results = scrolledtext.ScrolledText(
     root,
     width=115,
