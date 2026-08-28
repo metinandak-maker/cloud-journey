@@ -5,71 +5,84 @@ from anthropic import Anthropic
 
 load_dotenv()
 
-# Atlas / OpenAI
 openai_client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY")
 )
 
-# Claude / Anthropic
 anthropic_client = Anthropic(
     api_key=os.getenv("ANTHROPIC_API_KEY")
 )
 
-# Grok / xAI
 grok_client = OpenAI(
     api_key=os.getenv("XAI_API_KEY"),
     base_url="https://api.x.ai/v1"
 )
 
-print("=" * 40)
-print("           METIN AI LAB")
-print("=" * 40)
+print("=" * 50)
+print("              METIN AI LAB")
+print("=" * 50)
+
+question = input("\nASK THE COUNCIL:\n> ")
+
+print("\nThinking...\n")
 
 # ATLAS
 try:
-    response = openai_client.responses.create(
+    atlas_response = openai_client.responses.create(
         model="gpt-5.6",
-        input="Reply with exactly: Atlas connected to METIN AI LAB."
+        input=question
     )
-    print("Atlas :", response.output_text)
+    atlas_answer = atlas_response.output_text
 
 except Exception as error:
-    print("Atlas : CONNECTION ERROR")
-    print(error)
+    atlas_answer = f"CONNECTION ERROR: {error}"
 
 # CLAUDE
 try:
-    message = anthropic_client.messages.create(
+    claude_response = anthropic_client.messages.create(
         model="claude-sonnet-5",
-        max_tokens=50,
+        max_tokens=600,
         messages=[
             {
                 "role": "user",
-                "content": "Reply with exactly: Claude connected to METIN AI LAB."
+                "content": question
             }
         ]
     )
-    print("Claude:", message.content[0].text)
+    claude_answer = claude_response.content[0].text
 
 except Exception as error:
-    print("Claude: CONNECTION ERROR")
-    print(error)
+    claude_answer = f"CONNECTION ERROR: {error}"
 
 # GROK
 try:
-    response = grok_client.chat.completions.create(
+    grok_response = grok_client.chat.completions.create(
         model="grok-4.6",
         messages=[
             {
                 "role": "user",
-                "content": "Reply with exactly: Grok connected to METIN AI LAB."
+                "content": question
             }
         ]
     )
-    print("Grok  :", response.choices[0].message.content)
+    grok_answer = grok_response.choices[0].message.content
 
 except Exception as error:
-    print("Grok  : CONNECTION ERROR")
-    print(error)
+    grok_answer = f"CONNECTION ERROR: {error}"
 
-print("=" * 40)
+print("\n" + "=" * 50)
+
+print("\nATLAS:\n")
+print(atlas_answer)
+
+print("\n" + "-" * 50)
+
+print("\nCLAUDE:\n")
+print(claude_answer)
+
+print("\n" + "-" * 50)
+
+print("\nGROK:\n")
+print(grok_answer)
+
+print("\n" + "=" * 50)
