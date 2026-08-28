@@ -1,6 +1,8 @@
 import tkinter as tk
 from tkinter import scrolledtext, filedialog
 import threading
+from datetime import datetime
+
 
 from engine import run_council
 
@@ -61,9 +63,26 @@ def save_final_answer():
             file.write(last_final_answer)
 
 
+def archive_result(question, final_answer):
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    with open("council_archive.txt", "a", encoding="utf-8") as file:
+        file.write("\n" + "=" * 60 + "\n")
+        file.write(f"DATE: {timestamp}\n")
+        file.write(f"QUESTION: {question}\n\n")
+        file.write("FINAL ANSWER:\n")
+        file.write(final_answer)
+        file.write("\n")
+
+
 def show_results(council):
     global last_final_answer
     last_final_answer = council.get("final", "")
+
+    question = question_box.get("1.0", tk.END).strip()
+
+    if last_final_answer:
+        archive_result(question, last_final_answer)
 
     results.delete("1.0", tk.END)
 
