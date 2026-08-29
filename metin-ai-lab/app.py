@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import scrolledtext, filedialog
 import threading
+import os
 from datetime import datetime
 
 
@@ -66,7 +67,19 @@ def save_final_answer():
 def archive_result(question, final_answer):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    with open("council_archive.txt", "a", encoding="utf-8") as file:
+    archive_dir = os.path.join(
+        os.path.expanduser("~"),
+        "Documents",
+        "Metin AI Lab"
+    )
+    os.makedirs(archive_dir, exist_ok=True)
+
+    archive_path = os.path.join(
+        archive_dir,
+        "council_archive.txt"
+    )
+
+    with open(archive_path, "a", encoding="utf-8") as file:
         file.write("\n" + "=" * 60 + "\n")
         file.write(f"DATE: {timestamp}\n")
         file.write(f"QUESTION: {question}\n\n")
