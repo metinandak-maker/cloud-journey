@@ -1,0 +1,6 @@
+Metin 90 - Day 7 System Monitoring
+free -h = shows RAM/memory usage on Linux (not available in Git Bash)
+top = live CPU, memory and process monitoring on Linux (not available in Git Bash)
+uptime = shows system uptime and load average on Linux (not available in Git Bash)
+df -h = shows filesystem disk usage
+du -sh . = shows disk space used by the current directory
