@@ -1,0 +1,8 @@
+Metin 90 - Day 7 Environment Variables
+Environment variable = a named value stored in the shell environment
+export = create or set an environment variable
+echo $VARIABLE = display the value of a variable
+.bashrc = Bash startup configuration file
+source ~/.bashrc = reload Bash settings
+
+.bashrc loads my settings automatically when I start a new Bash session.
