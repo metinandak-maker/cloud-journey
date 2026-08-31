@@ -30,34 +30,36 @@ def ask_council():
 
     root.update_idletasks()
 
+    mode = selected_mode
+
     thread = threading.Thread(
         target=run_selected_mode,
-        args=(question,),
+        args=(question, mode),
         daemon=True
     )
     thread.start()
 
 
-def run_selected_mode(question):
+def run_selected_mode(question, mode):
     try:
-        if selected_mode == "COUNCIL":
+        if mode == "COUNCIL":
             response = run_council(question)
             root.after(0, show_results, response)
             return
 
-        if selected_mode == "ATLAS":
+        if mode == "ATLAS":
             answer = ask_atlas(question)
-        elif selected_mode == "CLAUDE":
+        elif mode == "CLAUDE":
             answer = ask_claude(question)
-        elif selected_mode == "GROK":
+        elif mode == "GROK":
             answer = ask_grok(question)
         else:
             answer = "Unknown AI mode."
 
-        root.after(0, show_single_result, selected_mode, answer)
+        root.after(0, show_single_result, mode, answer)
 
     except Exception as error:
-        root.after(0, show_single_result, selected_mode, f"ERROR: {error}")
+        root.after(0, show_single_result, mode, f"ERROR: {error}")
 
 
 def show_single_result(mode, answer):
