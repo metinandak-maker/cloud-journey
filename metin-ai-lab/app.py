@@ -254,7 +254,7 @@ COUNCIL FINAL ANSWER
 
 
 root = tk.Tk()
-root.title("METIN AI LAB - AI COUNCIL")
+root.title("METIN AI LAB v0.2 - AI COUNCIL")
 root.geometry("1100x820")
 root.minsize(900, 700)
 root.configure(bg="#10131a")
@@ -274,7 +274,7 @@ title.pack()
 
 subtitle = tk.Label(
     header,
-    text="AI COUNCIL  •  ATLAS  •  CLAUDE  •  GROK",
+    text="v0.2  •  MULTI-AI COUNCIL",
     font=("Arial", 11, "bold"),
     fg="#8ea0ba",
     bg="#10131a"
@@ -297,7 +297,8 @@ def set_mode(mode):
         else:
             button.config(bg="#252c38", fg="#f4f6fb")
 
-    status_label.config(text=f"● {mode} READY")
+    status_label.config(text=f"{mode} • READY")
+    ask_button.config(text=f"ASK {mode}")
 
 
 for mode in ("COUNCIL", "ATLAS", "CLAUDE", "GROK"):
@@ -375,7 +376,7 @@ ask_button.pack(side="left", padx=(0, 10))
 
 copy_button = tk.Button(
     button_frame,
-    text="COPY FINAL ANSWER",
+    text="COPY ANSWER",
     command=copy_final_answer,
     font=("Arial", 10, "bold"),
     bg="#252c38",
@@ -392,7 +393,7 @@ copy_button.pack(side="left", padx=(0, 10))
 
 save_button = tk.Button(
     button_frame,
-    text="SAVE RESULT",
+    text="SAVE",
     command=save_final_answer,
     font=("Arial", 10, "bold"),
     bg="#252c38",
@@ -426,7 +427,7 @@ history_button.pack(side="left")
 
 status_label = tk.Label(
     button_frame,
-    text="● COUNCIL READY",
+    text="COUNCIL • READY",
     font=("Arial", 9, "bold"),
     fg="#67d391",
     bg="#10131a"
@@ -449,7 +450,7 @@ results_frame.pack(
 
 results_title = tk.Label(
     results_frame,
-    text="Council Results",
+    text="AI RESPONSE",
     font=("Arial", 12, "bold"),
     fg="#f4f6fb",
     bg="#181d27"
