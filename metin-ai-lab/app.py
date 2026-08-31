@@ -161,68 +161,166 @@ COUNCIL FINAL ANSWER
 
 
 root = tk.Tk()
-
 root.title("METIN AI LAB - AI COUNCIL")
-root.geometry("1050x780")
+root.geometry("1100x820")
+root.minsize(900, 700)
+root.configure(bg="#10131a")
+
+# ---------- HEADER ----------
+header = tk.Frame(root, bg="#10131a")
+header.pack(fill="x", padx=30, pady=(24, 12))
 
 title = tk.Label(
-    root,
-    text="METIN AI LAB - AI COUNCIL",
-    font=("Arial", 20, "bold")
+    header,
+    text="METIN AI LAB",
+    font=("Arial", 26, "bold"),
+    fg="#f4f6fb",
+    bg="#10131a"
 )
-title.pack(pady=15)
+title.pack()
+
+subtitle = tk.Label(
+    header,
+    text="AI COUNCIL  •  ATLAS  •  CLAUDE  •  GROK",
+    font=("Arial", 11, "bold"),
+    fg="#8ea0ba",
+    bg="#10131a"
+)
+subtitle.pack(pady=(5, 0))
+
+# ---------- QUESTION PANEL ----------
+question_frame = tk.Frame(
+    root,
+    bg="#181d27",
+    highlightbackground="#2a3342",
+    highlightthickness=1
+)
+question_frame.pack(fill="x", padx=30, pady=(8, 12))
 
 question_label = tk.Label(
-    root,
-    text="Ask the Council:",
-    font=("Arial", 12, "bold")
+    question_frame,
+    text="Ask the Council",
+    font=("Arial", 12, "bold"),
+    fg="#f4f6fb",
+    bg="#181d27"
 )
-question_label.pack()
+question_label.pack(anchor="w", padx=18, pady=(15, 7))
 
 question_box = tk.Text(
-    root,
-    height=4,
-    width=100,
-    font=("Arial", 11)
-)
-question_box.pack(
-    padx=20,
+    question_frame,
+    height=5,
+    wrap="word",
+    font=("Arial", 12),
+    bg="#0f141c",
+    fg="#f4f6fb",
+    insertbackground="#ffffff",
+    relief="flat",
+    padx=12,
     pady=10
 )
+question_box.pack(fill="x", padx=18, pady=(0, 15))
+
+# ---------- BUTTON BAR ----------
+button_frame = tk.Frame(root, bg="#10131a")
+button_frame.pack(fill="x", padx=30, pady=(0, 12))
 
 ask_button = tk.Button(
-    root,
+    button_frame,
     text="ASK COUNCIL",
     command=ask_council,
-    font=("Arial", 12, "bold"),
-    width=20
+    font=("Arial", 11, "bold"),
+    bg="#2563eb",
+    fg="white",
+    activebackground="#1d4ed8",
+    activeforeground="white",
+    relief="flat",
+    bd=0,
+    padx=22,
+    pady=10,
+    cursor="hand2"
 )
-ask_button.pack(pady=10)
+ask_button.pack(side="left", padx=(0, 10))
+
 copy_button = tk.Button(
-    root,
+    button_frame,
     text="COPY FINAL ANSWER",
     command=copy_final_answer,
-    font=("Arial", 11, "bold"),
-    width=20
+    font=("Arial", 10, "bold"),
+    bg="#252c38",
+    fg="#f4f6fb",
+    activebackground="#303947",
+    activeforeground="white",
+    relief="flat",
+    bd=0,
+    padx=18,
+    pady=10,
+    cursor="hand2"
 )
-copy_button.pack(pady=5)
+copy_button.pack(side="left", padx=(0, 10))
+
 save_button = tk.Button(
-    root,
+    button_frame,
     text="SAVE RESULT",
     command=save_final_answer,
-    font=("Arial", 11, "bold"),
-    width=20
+    font=("Arial", 10, "bold"),
+    bg="#252c38",
+    fg="#f4f6fb",
+    activebackground="#303947",
+    activeforeground="white",
+    relief="flat",
+    bd=0,
+    padx=18,
+    pady=10,
+    cursor="hand2"
 )
-save_button.pack(pady=5)
-results = scrolledtext.ScrolledText(
+save_button.pack(side="left")
+
+status_label = tk.Label(
+    button_frame,
+    text="● COUNCIL READY",
+    font=("Arial", 9, "bold"),
+    fg="#67d391",
+    bg="#10131a"
+)
+status_label.pack(side="right", pady=10)
+
+# ---------- RESULTS PANEL ----------
+results_frame = tk.Frame(
     root,
-    width=115,
-    height=28,
-    font=("Consolas", 10)
+    bg="#181d27",
+    highlightbackground="#2a3342",
+    highlightthickness=1
+)
+results_frame.pack(
+    fill="both",
+    expand=True,
+    padx=30,
+    pady=(0, 25)
+)
+
+results_title = tk.Label(
+    results_frame,
+    text="Council Results",
+    font=("Arial", 12, "bold"),
+    fg="#f4f6fb",
+    bg="#181d27"
+)
+results_title.pack(anchor="w", padx=18, pady=(14, 5))
+
+results = scrolledtext.ScrolledText(
+    results_frame,
+    wrap="word",
+    font=("Consolas", 10),
+    bg="#0f141c",
+    fg="#dce3ee",
+    insertbackground="#ffffff",
+    relief="flat",
+    padx=14,
+    pady=12
 )
 results.pack(
-    padx=20,
-    pady=15,
+    padx=18,
+    pady=(5, 18),
     fill="both",
     expand=True
 )
@@ -230,7 +328,8 @@ results.pack(
 results.insert(
     tk.END,
     "METIN AI LAB ready.\n\n"
-    "Ask a question and press ASK COUNCIL."
+    "Atlas, Claude and Grok are standing by.\n"
+    "Enter a question above and press ASK COUNCIL."
 )
 
 root.mainloop()
