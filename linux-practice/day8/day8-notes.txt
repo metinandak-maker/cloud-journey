@@ -1,0 +1,17 @@
+Day 8 - Linux Pipes and Redirection
+
+Commands practiced:
+>       Redirect output to a file
+>>      Append output to a file
+|       Pipe output to another command
+grep    Filter matching lines
+wc -l   Count lines
+
+Examples:
+grep ERROR server.log
+grep ERROR server.log > errors.log
+cat server.log | grep INFO | wc -l
+cat server.log | grep WARNING | wc -l
+
+Key lesson:
+Linux commands can be combined to filter and analyze log files.
