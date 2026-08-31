@@ -124,6 +124,63 @@ def archive_result(question, final_answer):
         file.write("\n")
 
 
+def show_history():
+    archive_dir = os.path.join(
+        os.path.expanduser("~"),
+        "Documents",
+        "Metin AI Lab"
+    )
+
+    archive_path = os.path.join(
+        archive_dir,
+        "council_archive.txt"
+    )
+
+    history_window = tk.Toplevel(root)
+    history_window.title("METIN AI LAB - HISTORY")
+    history_window.geometry("900x650")
+    history_window.configure(bg="#10131a")
+
+    title = tk.Label(
+        history_window,
+        text="COUNCIL HISTORY",
+        font=("Arial", 18, "bold"),
+        fg="#f4f6fb",
+        bg="#10131a"
+    )
+    title.pack(pady=(18, 10))
+
+    history_box = scrolledtext.ScrolledText(
+        history_window,
+        wrap="word",
+        font=("Consolas", 10),
+        bg="#0f141c",
+        fg="#dce3ee",
+        insertbackground="#ffffff",
+        relief="flat",
+        padx=14,
+        pady=12
+    )
+    history_box.pack(
+        fill="both",
+        expand=True,
+        padx=20,
+        pady=(0, 20)
+    )
+
+    if not os.path.exists(archive_path):
+        history_box.insert(
+            tk.END,
+            "No archived Council results found yet."
+        )
+        return
+
+    with open(archive_path, "r", encoding="utf-8") as file:
+        history_box.insert(tk.END, file.read())
+
+    history_box.see(tk.END)
+
+
 def show_results(council):
     global last_final_answer
     last_final_answer = council.get("final", "")
@@ -348,7 +405,24 @@ save_button = tk.Button(
     pady=10,
     cursor="hand2"
 )
-save_button.pack(side="left")
+save_button.pack(side="left", padx=(0, 10))
+
+history_button = tk.Button(
+    button_frame,
+    text="HISTORY",
+    command=show_history,
+    font=("Arial", 10, "bold"),
+    bg="#252c38",
+    fg="#f4f6fb",
+    activebackground="#303947",
+    activeforeground="white",
+    relief="flat",
+    bd=0,
+    padx=18,
+    pady=10,
+    cursor="hand2"
+)
+history_button.pack(side="left")
 
 status_label = tk.Label(
     button_frame,
