@@ -5,10 +5,11 @@ import os
 from datetime import datetime
 
 
-from engine import run_council
+from engine import run_council, ask_atlas, ask_claude, ask_grok
 
 
 last_final_answer = ""
+selected_mode = "COUNCIL"
 
 
 def ask_council():
@@ -21,25 +22,60 @@ def ask_council():
 
     ask_button.config(state="disabled")
     results.delete("1.0", tk.END)
-    results.insert(tk.END, "Council is thinking...\n")
+
+    if selected_mode == "COUNCIL":
+        results.insert(tk.END, "Council is thinking...\n")
+    else:
+        results.insert(tk.END, f"{selected_mode.title()} is thinking...\n")
+
     root.update_idletasks()
 
     thread = threading.Thread(
-        target=run_council_thread,
+        target=run_selected_mode,
         args=(question,),
         daemon=True
     )
     thread.start()
 
 
-def run_council_thread(question):
-    council = run_council(question)
+def run_selected_mode(question):
+    try:
+        if selected_mode == "COUNCIL":
+            response = run_council(question)
+            root.after(0, show_results, response)
+            return
 
-    root.after(
-        0,
-        show_results,
-        council
+        if selected_mode == "ATLAS":
+            answer = ask_atlas(question)
+        elif selected_mode == "CLAUDE":
+            answer = ask_claude(question)
+        elif selected_mode == "GROK":
+            answer = ask_grok(question)
+        else:
+            answer = "Unknown AI mode."
+
+        root.after(0, show_single_result, selected_mode, answer)
+
+    except Exception as error:
+        root.after(0, show_single_result, selected_mode, f"ERROR: {error}")
+
+
+def show_single_result(mode, answer):
+    global last_final_answer
+
+    last_final_answer = str(answer)
+
+    results.delete("1.0", tk.END)
+    results.insert(
+        tk.END,
+        f"==============================\n"
+        f"{mode}\n"
+        f"==============================\n\n"
+        f"{answer}"
     )
+
+    results.see(tk.END)
+    ask_button.config(state="normal")
 
 def copy_final_answer():
     if last_final_answer:
@@ -188,6 +224,45 @@ subtitle = tk.Label(
 )
 subtitle.pack(pady=(5, 0))
 
+# ---------- MODE SELECTOR ----------
+mode_frame = tk.Frame(root, bg="#10131a")
+mode_frame.pack(fill="x", padx=30, pady=(0, 10))
+
+mode_buttons = {}
+
+def set_mode(mode):
+    global selected_mode
+    selected_mode = mode
+
+    for name, button in mode_buttons.items():
+        if name == mode:
+            button.config(bg="#2563eb", fg="white")
+        else:
+            button.config(bg="#252c38", fg="#f4f6fb")
+
+    status_label.config(text=f"● {mode} READY")
+
+
+for mode in ("COUNCIL", "ATLAS", "CLAUDE", "GROK"):
+    btn = tk.Button(
+        mode_frame,
+        text=mode,
+        command=lambda m=mode: set_mode(m),
+        font=("Arial", 10, "bold"),
+        bg="#252c38",
+        fg="#f4f6fb",
+        activebackground="#303947",
+        activeforeground="white",
+        relief="flat",
+        bd=0,
+        padx=18,
+        pady=8,
+        cursor="hand2"
+    )
+    btn.pack(side="left", padx=(0, 8))
+    mode_buttons[mode] = btn
+
+
 # ---------- QUESTION PANEL ----------
 question_frame = tk.Frame(
     root,
@@ -331,5 +406,7 @@ results.insert(
     "Atlas, Claude and Grok are standing by.\n"
     "Enter a question above and press ASK COUNCIL."
 )
+
+set_mode("COUNCIL")
 
 root.mainloop()
