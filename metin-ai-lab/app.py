@@ -140,6 +140,21 @@ def archive_result(question, final_answer):
         file.write("\n")
 
 
+def new_chat():
+    global last_final_answer
+
+    last_final_answer = ""
+
+    for mode in response_cache:
+        response_cache[mode] = ""
+
+    question_box.delete("1.0", tk.END)
+    results.delete("1.0", tk.END)
+    results.insert(tk.END, f"{selected_mode} ready. Ask a question.")
+
+    question_box.focus_set()
+
+
 def show_history():
     archive_dir = os.path.join(
         os.path.expanduser("~"),
@@ -439,7 +454,24 @@ history_button = tk.Button(
     pady=10,
     cursor="hand2"
 )
-history_button.pack(side="left")
+history_button.pack(side="left", padx=(0, 10))
+
+new_chat_button = tk.Button(
+    button_frame,
+    text="NEW CHAT",
+    command=new_chat,
+    font=("Arial", 10, "bold"),
+    bg="#252c38",
+    fg="#f4f6fb",
+    activebackground="#303947",
+    activeforeground="white",
+    relief="flat",
+    bd=0,
+    padx=18,
+    pady=10,
+    cursor="hand2"
+)
+new_chat_button.pack(side="left")
 
 status_label = tk.Label(
     button_frame,
