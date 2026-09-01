@@ -11,6 +11,13 @@ from engine import run_council, ask_atlas, ask_claude, ask_grok
 last_final_answer = ""
 selected_mode = "COUNCIL"
 
+response_cache = {
+    "COUNCIL": "",
+    "ATLAS": "",
+    "CLAUDE": "",
+    "GROK": ""
+}
+
 
 def ask_council():
     question = question_box.get("1.0", tk.END).strip()
@@ -67,22 +74,29 @@ def show_single_result(mode, answer):
 
     last_final_answer = str(answer)
 
-    results.delete("1.0", tk.END)
-    results.insert(
-        tk.END,
+    output = (
         f"==============================\n"
         f"{mode}\n"
         f"==============================\n\n"
         f"{answer}"
     )
 
-    results.see(tk.END)
+    response_cache[mode] = output
+
+    if selected_mode == mode:
+        results.delete("1.0", tk.END)
+        results.insert(tk.END, output)
+        results.see(tk.END)
+
     ask_button.config(state="normal")
 
+
 def copy_final_answer():
-    if last_final_answer:
+    full_text = results.get("1.0", tk.END).strip()
+
+    if full_text:
         root.clipboard_clear()
-        root.clipboard_append(last_final_answer)
+        root.clipboard_append(full_text)
         root.update()
 
 
