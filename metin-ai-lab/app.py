@@ -20,12 +20,17 @@ projects = [
     "Website Client"
 ]
 
-response_cache = {
-    "COUNCIL": "",
-    "ATLAS": "",
-    "CLAUDE": "",
-    "GROK": ""
+project_response_cache = {
+    project: {
+        "COUNCIL": "",
+        "ATLAS": "",
+        "CLAUDE": "",
+        "GROK": ""
+    }
+    for project in projects
 }
+
+response_cache = project_response_cache[selected_project]
 
 
 thinking_after_id = None
@@ -490,6 +495,25 @@ question_box = tk.Text(
 question_box.pack(fill="x", padx=18, pady=(0, 11))
 
 # ---------- BUTTON BAR ----------
+def set_project(project):
+    global selected_project, response_cache
+
+    selected_project = project
+    response_cache = project_response_cache[selected_project]
+
+    results.delete("1.0", tk.END)
+
+    cached_response = response_cache.get(selected_mode, "")
+
+    if cached_response:
+        results.insert(tk.END, cached_response)
+    else:
+        results.insert(
+            tk.END,
+            f"{selected_project} / {selected_mode} ready. Ask a question."
+        )
+
+
 # ---------- PROJECT WORKSPACE ----------
 project_frame = tk.Frame(root, bg="#f4f7fb")
 project_frame.pack(fill="x", padx=36, pady=(0, 10))
@@ -508,7 +532,8 @@ project_var = tk.StringVar(value=selected_project)
 project_menu = tk.OptionMenu(
     project_frame,
     project_var,
-    *projects
+    *projects,
+    command=set_project
 )
 project_menu.config(
     font=("Segoe UI", 10, "bold"),
@@ -704,5 +729,6 @@ results.insert(
 set_mode("COUNCIL")
 
 root.mainloop()
+
 
 
