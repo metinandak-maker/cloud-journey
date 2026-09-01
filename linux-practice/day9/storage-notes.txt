@@ -1,0 +1,19 @@
+Day 9 - Linux Disk and Storage Basics
+
+df -h
+Shows filesystem disk usage in human-readable format.
+
+du -sh .
+Shows the total size of the current directory.
+
+lsblk
+Lists block devices such as disks and swap.
+
+Important:
+Windows C: is mounted in WSL as /mnt/c.
+
+Today:
+C: total ~238G
+Used ~66G
+Free ~172G
+Usage ~28%
