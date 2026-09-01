@@ -19,6 +19,64 @@ response_cache = {
 }
 
 
+thinking_after_id = None
+thinking_mode = None
+thinking_step = 0
+
+
+def start_thinking_animation(mode):
+    global thinking_after_id, thinking_mode, thinking_step
+
+    stop_thinking_animation(set_ready=False)
+
+    thinking_mode = mode
+    thinking_step = 0
+
+    def animate():
+        global thinking_after_id, thinking_step
+
+        if thinking_mode != mode:
+            return
+
+        dots = "." * ((thinking_step % 3) + 1)
+
+        if selected_mode == mode:
+            status_label.config(
+                text=f"{mode}  ?  THINKING{dots}",
+                fg="#38bdf8"
+            )
+
+        thinking_step += 1
+        thinking_after_id = root.after(350, animate)
+
+    animate()
+
+
+def stop_thinking_animation(mode=None, set_ready=True):
+    global thinking_after_id, thinking_mode, thinking_step
+
+    if mode is not None and thinking_mode != mode:
+        return
+
+    finished_mode = thinking_mode
+
+    if thinking_after_id is not None:
+        try:
+            root.after_cancel(thinking_after_id)
+        except tk.TclError:
+            pass
+
+    thinking_after_id = None
+    thinking_mode = None
+    thinking_step = 0
+
+    if set_ready and finished_mode and selected_mode == finished_mode:
+        status_label.config(
+            text=f"{finished_mode}  ?  READY",
+            fg="#4ade80"
+        )
+
+
 def ask_council():
     question = question_box.get("1.0", tk.END).strip()
 
@@ -30,14 +88,15 @@ def ask_council():
     ask_button.config(state="disabled")
     results.delete("1.0", tk.END)
 
-    if selected_mode == "COUNCIL":
+    mode = selected_mode
+
+    if mode == "COUNCIL":
         results.insert(tk.END, "Council is thinking...\n")
     else:
-        results.insert(tk.END, f"{selected_mode.title()} is thinking...\n")
+        results.insert(tk.END, f"{mode.title()} is thinking...\n")
 
+    start_thinking_animation(mode)
     root.update_idletasks()
-
-    mode = selected_mode
 
     thread = threading.Thread(
         target=run_selected_mode,
@@ -72,6 +131,7 @@ def run_selected_mode(question, mode):
 def show_single_result(mode, answer):
     global last_final_answer
 
+    stop_thinking_animation(mode)
     last_final_answer = str(answer)
 
     output = (
@@ -215,6 +275,8 @@ def show_history():
 
 def show_results(council):
     global last_final_answer
+
+    stop_thinking_animation("COUNCIL")
     last_final_answer = council.get("final", "")
 
     question = question_box.get("1.0", tk.END).strip()
