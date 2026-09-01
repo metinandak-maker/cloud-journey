@@ -231,14 +231,14 @@ def show_history():
     history_window = tk.Toplevel(root)
     history_window.title("METIN AI LAB - HISTORY")
     history_window.geometry("900x650")
-    history_window.configure(bg="#0b0f17")
+    history_window.configure(bg="#f4f7fb")
 
     title = tk.Label(
         history_window,
         text="COUNCIL HISTORY",
         font=("Arial", 18, "bold"),
-        fg="#f4f6fb",
-        bg="#0b0f17"
+        fg="#10233f",
+        bg="#f4f7fb"
     )
     title.pack(pady=(18, 10))
 
@@ -246,9 +246,9 @@ def show_history():
         history_window,
         wrap="word",
         font=("Consolas", 10),
-        bg="#0f141c",
-        fg="#dce3ee",
-        insertbackground="#38bdf8",
+        bg="#ffffff",
+        fg="#172b4d",
+        insertbackground="#2563eb",
         relief="flat",
         padx=14,
         pady=12
@@ -296,50 +296,52 @@ def show_results(council):
         return
 
     output = f"""
-==============================
-ATLAS
-==============================
+==================================================
+                 AI COUNCIL REPORT
+==================================================
+
+ATLAS  ?  ANALYSIS
+--------------------------------------------------
 
 {council["atlas"]}
 
 
-==============================
-CLAUDE
-==============================
+CLAUDE  ?  ANALYSIS
+--------------------------------------------------
 
 {council["claude"]}
 
 
-==============================
-GROK
-==============================
+GROK  ?  ANALYSIS
+--------------------------------------------------
 
 {council["grok"]}
 
 
-==============================
-ATLAS REVIEW
-==============================
+==================================================
+                 COUNCIL REVIEW
+==================================================
+
+ATLAS  ?  REVIEW
+--------------------------------------------------
 
 {council["atlas_review"]}
 
 
-==============================
-CLAUDE REVIEW
-==============================
+CLAUDE  ?  REVIEW
+--------------------------------------------------
 
 {council["claude_review"]}
 
 
-==============================
-GROK REVIEW
-==============================
+GROK  ?  REVIEW
+--------------------------------------------------
 
 {council["grok_review"]}
 
 
 ==================================================
-COUNCIL FINAL ANSWER
+              FINAL RECOMMENDATION
 ==================================================
 
 {council["final"]}
@@ -357,9 +359,15 @@ COUNCIL FINAL ANSWER
 
 root = tk.Tk()
 root.title("METIN AI LAB v0.2 - AI COUNCIL")
-root.geometry("1100x820")
-root.minsize(900, 700)
-root.configure(bg="#0b0f17")
+root.geometry("1280x900")
+root.minsize(640, 600)
+
+# Open maximized while keeping the Windows taskbar visible
+try:
+    root.state("zoomed")
+except tk.TclError:
+    pass
+root.configure(bg="#f4f7fb")
 
 # Smooth professional startup
 try:
@@ -379,15 +387,15 @@ except tk.TclError:
 
 
 # ---------- HEADER ----------
-header = tk.Frame(root, bg="#0b0f17")
-header.pack(fill="x", padx=30, pady=(24, 12))
+header = tk.Frame(root, bg="#f4f7fb")
+header.pack(fill="x", padx=36, pady=(16, 8))
 
 title = tk.Label(
     header,
     text="METIN AI LAB",
     font=("Segoe UI", 30, "bold"),
-    fg="#7dd3fc",
-    bg="#0b0f17"
+    fg="#0f2a4a",
+    bg="#f4f7fb"
 )
 title.pack()
 
@@ -396,12 +404,12 @@ subtitle = tk.Label(
     text="v0.2  •  MULTI-AI COUNCIL",
     font=("Arial", 11, "bold"),
     fg="#8ea0ba",
-    bg="#0b0f17"
+    bg="#f4f7fb"
 )
 subtitle.pack(pady=(5, 0))
 
 # ---------- MODE SELECTOR ----------
-mode_frame = tk.Frame(root, bg="#0b0f17")
+mode_frame = tk.Frame(root, bg="#f4f7fb")
 mode_frame.pack(fill="x", padx=30, pady=(0, 10))
 
 mode_buttons = {}
@@ -414,7 +422,7 @@ def set_mode(mode):
         if name == mode:
             button.config(bg="#2563eb", fg="white")
         else:
-            button.config(bg="#252c38", fg="#f4f6fb")
+            button.config(bg="#e8eef6", fg="#10233f")
 
     status_label.config(text=f"{mode} • READY")
     ask_button.config(text=f"ASK {mode}")
@@ -426,9 +434,9 @@ for mode in ("COUNCIL", "ATLAS", "CLAUDE", "GROK"):
         text=mode,
         command=lambda m=mode: set_mode(m),
         font=("Segoe UI", 10, "bold"),
-        bg="#252c38",
-        fg="#f4f6fb",
-        activebackground="#303947",
+        bg="#e8eef6",
+        fg="#10233f",
+        activebackground="#dce6f2",
         activeforeground="white",
         relief="flat",
         bd=0,
@@ -443,38 +451,38 @@ for mode in ("COUNCIL", "ATLAS", "CLAUDE", "GROK"):
 # ---------- QUESTION PANEL ----------
 question_frame = tk.Frame(
     root,
-    bg="#111827",
-    highlightbackground="#334155",
+    bg="#ffffff",
+    highlightbackground="#d8e1ec",
     highlightthickness=1
 )
-question_frame.pack(fill="x", padx=30, pady=(8, 12))
+question_frame.pack(fill="x", padx=36, pady=(6, 10))
 
 question_label = tk.Label(
     question_frame,
     text="Ask the Council",
     font=("Arial", 12, "bold"),
-    fg="#f4f6fb",
-    bg="#181d27"
+    fg="#10233f",
+    bg="#ffffff"
 )
-question_label.pack(anchor="w", padx=18, pady=(15, 7))
+question_label.pack(anchor="w", padx=18, pady=(11, 5))
 
 question_box = tk.Text(
     question_frame,
-    height=5,
+    height=3,
     wrap="word",
     font=("Arial", 12),
-    bg="#0f141c",
-    fg="#f4f6fb",
-    insertbackground="#38bdf8",
+    bg="#ffffff",
+    fg="#10233f",
+    insertbackground="#2563eb",
     relief="flat",
     padx=12,
     pady=10
 )
-question_box.pack(fill="x", padx=18, pady=(0, 15))
+question_box.pack(fill="x", padx=18, pady=(0, 11))
 
 # ---------- BUTTON BAR ----------
-button_frame = tk.Frame(root, bg="#0b0f17")
-button_frame.pack(fill="x", padx=30, pady=(0, 12))
+button_frame = tk.Frame(root, bg="#f4f7fb")
+button_frame.pack(fill="x", padx=36, pady=(0, 10))
 
 ask_button = tk.Button(
     button_frame,
@@ -498,9 +506,9 @@ copy_button = tk.Button(
     text="COPY ANSWER",
     command=copy_final_answer,
     font=("Segoe UI", 10, "bold"),
-    bg="#252c38",
-    fg="#f4f6fb",
-    activebackground="#303947",
+    bg="#e8eef6",
+    fg="#10233f",
+    activebackground="#dce6f2",
     activeforeground="white",
     relief="flat",
     bd=0,
@@ -515,9 +523,9 @@ save_button = tk.Button(
     text="SAVE",
     command=save_final_answer,
     font=("Segoe UI", 10, "bold"),
-    bg="#252c38",
-    fg="#f4f6fb",
-    activebackground="#303947",
+    bg="#e8eef6",
+    fg="#10233f",
+    activebackground="#dce6f2",
     activeforeground="white",
     relief="flat",
     bd=0,
@@ -532,9 +540,9 @@ history_button = tk.Button(
     text="HISTORY",
     command=show_history,
     font=("Segoe UI", 10, "bold"),
-    bg="#252c38",
-    fg="#f4f6fb",
-    activebackground="#303947",
+    bg="#e8eef6",
+    fg="#10233f",
+    activebackground="#dce6f2",
     activeforeground="white",
     relief="flat",
     bd=0,
@@ -549,9 +557,9 @@ new_chat_button = tk.Button(
     text="NEW CHAT",
     command=new_chat,
     font=("Segoe UI", 10, "bold"),
-    bg="#252c38",
-    fg="#f4f6fb",
-    activebackground="#303947",
+    bg="#e8eef6",
+    fg="#10233f",
+    activebackground="#dce6f2",
     activeforeground="white",
     relief="flat",
     bd=0,
@@ -566,7 +574,7 @@ status_label = tk.Label(
     text="COUNCIL • READY",
     font=("Segoe UI", 9, "bold"),
     fg="#4ade80",
-    bg="#0b0f17"
+    bg="#f4f7fb"
 )
 status_label.pack(side="right", pady=10)
 
@@ -591,7 +599,7 @@ for widget in (
     history_button,
     new_chat_button
 ):
-    add_hover_effect(widget, "#252c38", "#354154")
+    add_hover_effect(widget, "#e8eef6", "#d5e2f0")
 
 add_hover_effect(ask_button, "#2563eb", "#3b82f6")
 
@@ -599,23 +607,23 @@ add_hover_effect(ask_button, "#2563eb", "#3b82f6")
 # ---------- RESULTS PANEL ----------
 results_frame = tk.Frame(
     root,
-    bg="#111827",
-    highlightbackground="#334155",
+    bg="#ffffff",
+    highlightbackground="#d8e1ec",
     highlightthickness=1
 )
 results_frame.pack(
     fill="both",
     expand=True,
-    padx=30,
-    pady=(0, 25)
+    padx=36,
+    pady=(0, 18)
 )
 
 results_title = tk.Label(
     results_frame,
     text="AI RESPONSE",
     font=("Arial", 12, "bold"),
-    fg="#f4f6fb",
-    bg="#181d27"
+    fg="#10233f",
+    bg="#ffffff"
 )
 results_title.pack(anchor="w", padx=18, pady=(14, 5))
 
@@ -623,9 +631,9 @@ results = scrolledtext.ScrolledText(
     results_frame,
     wrap="word",
     font=("Segoe UI", 11),
-    bg="#0a0f18",
-    fg="#e5eefb",
-    insertbackground="#38bdf8",
+    bg="#ffffff",
+    fg="#172b4d",
+    insertbackground="#2563eb",
     relief="flat",
     padx=14,
     pady=12
