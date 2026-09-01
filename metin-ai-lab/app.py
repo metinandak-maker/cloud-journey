@@ -101,9 +101,10 @@ def copy_final_answer():
 
 
 def save_final_answer():
-    if not last_final_answer:
-        return
+    full_text = results.get("1.0", tk.END).strip()
 
+    if not full_text:
+        return
 
     file_path = filedialog.asksaveasfilename(
         defaultextension=".txt",
@@ -113,7 +114,7 @@ def save_final_answer():
 
     if file_path:
         with open(file_path, "w", encoding="utf-8") as file:
-            file.write(last_final_answer)
+            file.write(full_text)
 
 
 def archive_result(question, final_answer):
