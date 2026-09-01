@@ -11,6 +11,15 @@ from engine import run_council, ask_atlas, ask_claude, ask_grok
 last_final_answer = ""
 selected_mode = "COUNCIL"
 
+selected_project = "General"
+
+projects = [
+    "General",
+    "Cloud Journey",
+    "Pip",
+    "Website Client"
+]
+
 response_cache = {
     "COUNCIL": "",
     "ATLAS": "",
@@ -481,6 +490,46 @@ question_box = tk.Text(
 question_box.pack(fill="x", padx=18, pady=(0, 11))
 
 # ---------- BUTTON BAR ----------
+# ---------- PROJECT WORKSPACE ----------
+project_frame = tk.Frame(root, bg="#f4f7fb")
+project_frame.pack(fill="x", padx=36, pady=(0, 10))
+
+project_label = tk.Label(
+    project_frame,
+    text="PROJECT",
+    font=("Segoe UI", 9, "bold"),
+    fg="#52657d",
+    bg="#f4f7fb"
+)
+project_label.pack(side="left", padx=(0, 10))
+
+project_var = tk.StringVar(value=selected_project)
+
+project_menu = tk.OptionMenu(
+    project_frame,
+    project_var,
+    *projects
+)
+project_menu.config(
+    font=("Segoe UI", 10, "bold"),
+    bg="#ffffff",
+    fg="#10233f",
+    activebackground="#e8eef6",
+    activeforeground="#10233f",
+    relief="flat",
+    bd=0,
+    highlightthickness=1,
+    highlightbackground="#d8e1ec",
+    padx=12,
+    cursor="hand2"
+)
+project_menu["menu"].config(
+    font=("Segoe UI", 10),
+    bg="#ffffff",
+    fg="#10233f"
+)
+project_menu.pack(side="left")
+
 button_frame = tk.Frame(root, bg="#f4f7fb")
 button_frame.pack(fill="x", padx=36, pady=(0, 10))
 
@@ -655,3 +704,5 @@ results.insert(
 set_mode("COUNCIL")
 
 root.mainloop()
+
+
