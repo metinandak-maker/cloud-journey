@@ -284,10 +284,14 @@ def show_results(council):
     if last_final_answer:
         archive_result(question, last_final_answer)
 
-    results.delete("1.0", tk.END)
-
     if "error" in council:
-        results.insert(tk.END, council["error"])
+        error_output = str(council["error"])
+        response_cache["COUNCIL"] = error_output
+
+        if selected_mode == "COUNCIL":
+            results.delete("1.0", tk.END)
+            results.insert(tk.END, error_output)
+
         ask_button.config(state="normal")
         return
 
@@ -341,8 +345,12 @@ COUNCIL FINAL ANSWER
 {council["final"]}
 """
 
-    results.insert(tk.END, output)
-    results.see(tk.END)
+    response_cache["COUNCIL"] = output
+
+    if selected_mode == "COUNCIL":
+        results.delete("1.0", tk.END)
+        results.insert(tk.END, output)
+        results.see(tk.END)
 
     ask_button.config(state="normal")
 
