@@ -171,14 +171,14 @@ def show_history():
     history_window = tk.Toplevel(root)
     history_window.title("METIN AI LAB - HISTORY")
     history_window.geometry("900x650")
-    history_window.configure(bg="#10131a")
+    history_window.configure(bg="#0b0f17")
 
     title = tk.Label(
         history_window,
         text="COUNCIL HISTORY",
         font=("Arial", 18, "bold"),
         fg="#f4f6fb",
-        bg="#10131a"
+        bg="#0b0f17"
     )
     title.pack(pady=(18, 10))
 
@@ -188,7 +188,7 @@ def show_history():
         font=("Consolas", 10),
         bg="#0f141c",
         fg="#dce3ee",
-        insertbackground="#ffffff",
+        insertbackground="#38bdf8",
         relief="flat",
         padx=14,
         pady=12
@@ -289,18 +289,35 @@ root = tk.Tk()
 root.title("METIN AI LAB v0.2 - AI COUNCIL")
 root.geometry("1100x820")
 root.minsize(900, 700)
-root.configure(bg="#10131a")
+root.configure(bg="#0b0f17")
+
+# Smooth professional startup
+try:
+    root.attributes("-alpha", 0.0)
+
+    def fade_in(alpha=0.0):
+        alpha += 0.08
+        if alpha >= 1.0:
+            root.attributes("-alpha", 1.0)
+            return
+        root.attributes("-alpha", alpha)
+        root.after(18, lambda: fade_in(alpha))
+
+    root.after(80, fade_in)
+except tk.TclError:
+    pass
+
 
 # ---------- HEADER ----------
-header = tk.Frame(root, bg="#10131a")
+header = tk.Frame(root, bg="#0b0f17")
 header.pack(fill="x", padx=30, pady=(24, 12))
 
 title = tk.Label(
     header,
     text="METIN AI LAB",
-    font=("Arial", 26, "bold"),
-    fg="#f4f6fb",
-    bg="#10131a"
+    font=("Segoe UI", 30, "bold"),
+    fg="#7dd3fc",
+    bg="#0b0f17"
 )
 title.pack()
 
@@ -309,12 +326,12 @@ subtitle = tk.Label(
     text="v0.2  •  MULTI-AI COUNCIL",
     font=("Arial", 11, "bold"),
     fg="#8ea0ba",
-    bg="#10131a"
+    bg="#0b0f17"
 )
 subtitle.pack(pady=(5, 0))
 
 # ---------- MODE SELECTOR ----------
-mode_frame = tk.Frame(root, bg="#10131a")
+mode_frame = tk.Frame(root, bg="#0b0f17")
 mode_frame.pack(fill="x", padx=30, pady=(0, 10))
 
 mode_buttons = {}
@@ -338,7 +355,7 @@ for mode in ("COUNCIL", "ATLAS", "CLAUDE", "GROK"):
         mode_frame,
         text=mode,
         command=lambda m=mode: set_mode(m),
-        font=("Arial", 10, "bold"),
+        font=("Segoe UI", 10, "bold"),
         bg="#252c38",
         fg="#f4f6fb",
         activebackground="#303947",
@@ -356,8 +373,8 @@ for mode in ("COUNCIL", "ATLAS", "CLAUDE", "GROK"):
 # ---------- QUESTION PANEL ----------
 question_frame = tk.Frame(
     root,
-    bg="#181d27",
-    highlightbackground="#2a3342",
+    bg="#111827",
+    highlightbackground="#334155",
     highlightthickness=1
 )
 question_frame.pack(fill="x", padx=30, pady=(8, 12))
@@ -378,7 +395,7 @@ question_box = tk.Text(
     font=("Arial", 12),
     bg="#0f141c",
     fg="#f4f6fb",
-    insertbackground="#ffffff",
+    insertbackground="#38bdf8",
     relief="flat",
     padx=12,
     pady=10
@@ -386,7 +403,7 @@ question_box = tk.Text(
 question_box.pack(fill="x", padx=18, pady=(0, 15))
 
 # ---------- BUTTON BAR ----------
-button_frame = tk.Frame(root, bg="#10131a")
+button_frame = tk.Frame(root, bg="#0b0f17")
 button_frame.pack(fill="x", padx=30, pady=(0, 12))
 
 ask_button = tk.Button(
@@ -410,7 +427,7 @@ copy_button = tk.Button(
     button_frame,
     text="COPY ANSWER",
     command=copy_final_answer,
-    font=("Arial", 10, "bold"),
+    font=("Segoe UI", 10, "bold"),
     bg="#252c38",
     fg="#f4f6fb",
     activebackground="#303947",
@@ -427,7 +444,7 @@ save_button = tk.Button(
     button_frame,
     text="SAVE",
     command=save_final_answer,
-    font=("Arial", 10, "bold"),
+    font=("Segoe UI", 10, "bold"),
     bg="#252c38",
     fg="#f4f6fb",
     activebackground="#303947",
@@ -444,7 +461,7 @@ history_button = tk.Button(
     button_frame,
     text="HISTORY",
     command=show_history,
-    font=("Arial", 10, "bold"),
+    font=("Segoe UI", 10, "bold"),
     bg="#252c38",
     fg="#f4f6fb",
     activebackground="#303947",
@@ -461,7 +478,7 @@ new_chat_button = tk.Button(
     button_frame,
     text="NEW CHAT",
     command=new_chat,
-    font=("Arial", 10, "bold"),
+    font=("Segoe UI", 10, "bold"),
     bg="#252c38",
     fg="#f4f6fb",
     activebackground="#303947",
@@ -477,17 +494,43 @@ new_chat_button.pack(side="left")
 status_label = tk.Label(
     button_frame,
     text="COUNCIL • READY",
-    font=("Arial", 9, "bold"),
-    fg="#67d391",
-    bg="#10131a"
+    font=("Segoe UI", 9, "bold"),
+    fg="#4ade80",
+    bg="#0b0f17"
 )
 status_label.pack(side="right", pady=10)
+
+# ---------- PROFESSIONAL BUTTON HOVER ----------
+
+def add_hover_effect(button, normal_bg, hover_bg):
+    button.bind(
+        "<Enter>",
+        lambda event: button.config(bg=hover_bg)
+        if button.cget("state") != "disabled" else None
+    )
+    button.bind(
+        "<Leave>",
+        lambda event: button.config(bg=normal_bg)
+        if button.cget("state") != "disabled" else None
+    )
+
+
+for widget in (
+    copy_button,
+    save_button,
+    history_button,
+    new_chat_button
+):
+    add_hover_effect(widget, "#252c38", "#354154")
+
+add_hover_effect(ask_button, "#2563eb", "#3b82f6")
+
 
 # ---------- RESULTS PANEL ----------
 results_frame = tk.Frame(
     root,
-    bg="#181d27",
-    highlightbackground="#2a3342",
+    bg="#111827",
+    highlightbackground="#334155",
     highlightthickness=1
 )
 results_frame.pack(
@@ -509,10 +552,10 @@ results_title.pack(anchor="w", padx=18, pady=(14, 5))
 results = scrolledtext.ScrolledText(
     results_frame,
     wrap="word",
-    font=("Consolas", 10),
-    bg="#0f141c",
-    fg="#dce3ee",
-    insertbackground="#ffffff",
+    font=("Segoe UI", 11),
+    bg="#0a0f18",
+    fg="#e5eefb",
+    insertbackground="#38bdf8",
     relief="flat",
     padx=14,
     pady=12
