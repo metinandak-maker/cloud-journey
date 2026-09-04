@@ -554,7 +554,14 @@ project_menu["menu"].config(
     fg="#10233f"
 )
 project_menu.pack(side="left")
-
+status_label = tk.Label(
+    project_frame,
+    text="COUNCIL • READY",
+    font=("Segoe UI", 9, "bold"),
+    fg="#4ade80",
+    bg="#f4f7fb"
+)
+status_label.pack(side="right", pady=6)
 button_frame = tk.Frame(root, bg="#f4f7fb")
 button_frame.pack(fill="x", padx=36, pady=(0, 10))
 
@@ -641,17 +648,7 @@ new_chat_button = tk.Button(
     pady=10,
     cursor="hand2"
 )
-new_chat_button.pack(side="left")
-
-status_label = tk.Label(
-    button_frame,
-    text="COUNCIL • READY",
-    font=("Segoe UI", 9, "bold"),
-    fg="#4ade80",
-    bg="#f4f7fb"
-)
-status_label.pack(side="right", pady=10)
-
+new_chat_button.pack(side="left", padx=(0, 10))
 # ---------- PROFESSIONAL BUTTON HOVER ----------
 
 def add_hover_effect(button, normal_bg, hover_bg):
