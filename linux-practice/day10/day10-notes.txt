@@ -1,0 +1,29 @@
+METIN 90 - DAY 10
+
+Topic: Linux find command
+
+Today I learned:
+
+find . -type f
+find all files.
+
+find . -type d
+find all directories
+
+find . -type f -name "*.log"
+find .log files.
+
+find . -type f -name "*.conf"
+find .conf files.
+
+Key:
+
+.= current directory
+-type f = files
+-type d = directories
+-name = search by name 
+
+
+
+-name = case-sensitive
+-iname = case-insensitive
