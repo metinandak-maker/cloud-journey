@@ -1,0 +1,23 @@
+Day 11 - linux tar and backup practice
+
+Today I learned:
+
+- tar can archive files and directories
+- tar.gz uses gzip compression
+- c creates an archive
+- x extracts an archive
+- t lists archive contents
+- z uses gzip compression
+- v shows verbose output
+- f specifies the archive file
+- -C extracts files to a target directory
+- A tar command needs source files or directories when creating an archive
+
+
+
+Practice:
+
+Created backups of configs and logs.
+Compared .tar and .tar.gz files.
+Extracted a compressed backup into a restored directory
+Verified restored files with find and cat
