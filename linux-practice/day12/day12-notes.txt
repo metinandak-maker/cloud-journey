@@ -1,0 +1,6 @@
+apt update: Paket listesini yeniler; programları güncellemez
+
+apt install tree: tree paketini kurar
+
+--simulate neden kullanilir: hicbir degisiklik uygulanmaz sadece simule edilir
+
