@@ -1,0 +1,29 @@
+Day 13 - LInux Services and systemctl
+
+systemctl status SERVICE
+- Shows service status
+
+systemctl is-active SERVICE
+-Checks if service is running
+
+systemctl is-enabled SERVICE
+-Checks if service starts automatically at boot
+
+sudo systemctl start SERVICE
+- Start a SERVICE
+
+sudo systemctl stop SERVICE
+- Stop a SERVICE
+
+sudo systemctl restart SERVICE
+- Restarts a service
+
+sudo systemctl enable SERVICE
+- Enables automatic startup
+
+active = service is running now
+inactive = service is not running
+enabled = service starts automatically
+PID = Process ID
+
+Created atlas.service as a practice systemd service
