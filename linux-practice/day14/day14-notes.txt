@@ -1,0 +1,26 @@
+Day 14 - Linux Disk and Storage
+
+df -h
+Shows filesystem disk space usage.
+-h = human readable.
+
+du -sh .
+Shows total disk usage of the current directory.
+
+du -sh logs backups app-data
+Compares disk usage between directories.
+
+lsblk
+Lists block devices, disks, swap and mount points.
+
+Troubleshooting:
+df = Is the filesystem full?
+du = What is using the space?
+lsblk = What disks/block devices exist?
+
+WSL lesson:
+fallocate did not work on /mnt/c.
+dd worked for creating test files.
+
+Incident:
+app-data was using the most space: 50M.
