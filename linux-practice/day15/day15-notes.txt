@@ -1,0 +1,42 @@
+Day 15 - linux users, Groups and Ownership
+
+whoami
+Shows the current user.
+
+Id
+Shows UID, GID and group memberships.
+
+groups
+Shows which groups the user belongs to.
+
+chown
+Changes file group.
+Example: sudo chown metin file
+
+chgrp
+Changes file group.
+Example: sudo chgrp users file
+
+chown OWNER:GROUP FILE
+Changes owner and group together.
+
+chmod g+w FILE
+Adds write permission to the group.
+
+
+Troubleshooting Permission denied:
+1.whoami / id - who am i?
+2.Is -I - Who owns the file and what owns it?
+3.groups - Am I a member of that group?
+4.Check r, w, x permissions as required
+5.Fix ownership or permissions as required
+
+Lab: 
+root owned the file
+Groups was users
+metin belonged to users.
+After adding group write permission, metin coud write to the file  
+
+
+
+
