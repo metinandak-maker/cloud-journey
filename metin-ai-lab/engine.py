@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 from openai import OpenAI
 from anthropic import Anthropic
+from safety import safety_manager
 
 load_dotenv()
 
@@ -20,6 +21,11 @@ grok_client = OpenAI(
 
 
 def ask_atlas(prompt):
+    check = safety_manager.check_action("ask_model")
+
+    if not check["allowed"]:
+        return f"SAFETY BLOCK: {check['reason']}"
+
     try:
         response = openai_client.responses.create(
             model="gpt-5.6",
@@ -31,7 +37,13 @@ def ask_atlas(prompt):
         return f"ATLAS ERROR: {error}"
 
 
+
 def ask_claude(prompt):
+    check = safety_manager.check_action("ask_model")
+
+    if not check["allowed"]:
+        return f"SAFETY BLOCK: {check['reason']}"
+
     try:
         response = anthropic_client.messages.create(
             model="claude-sonnet-5",
@@ -60,6 +72,11 @@ def ask_claude(prompt):
 
 
 def ask_grok(prompt):
+    check = safety_manager.check_action("ask_model")
+
+    if not check["allowed"]:
+        return f"SAFETY BLOCK: {check['reason']}"
+
     try:
         response = grok_client.chat.completions.create(
             model="grok-4.6",
