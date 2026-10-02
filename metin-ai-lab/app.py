@@ -3,6 +3,7 @@ from tkinter import scrolledtext, filedialog
 import threading
 import os
 from datetime import datetime
+from safety import safety_manager
 
 
 from engine import run_council, ask_atlas, ask_claude, ask_grok
@@ -494,6 +495,30 @@ question_box = tk.Text(
 )
 question_box.pack(fill="x", padx=18, pady=(0, 11))
 
+def update_safety_ui():
+    if safety_manager.killed:
+        safety_status_label.config(
+            text="SAFETY: KILLED",
+            fg="#dc2626"
+        )
+        ask_button.config(state="disabled")
+    else:
+        safety_status_label.config(
+            text="SAFETY: ACTIVE",
+            fg="#16a34a"
+        )
+        ask_button.config(state="normal")
+
+
+def activate_kill_switch_ui():
+    safety_manager.activate_kill_switch()
+    update_safety_ui()
+
+
+def reset_safety_ui():
+    safety_manager.reset_kill_switch()
+    update_safety_ui()
+
 # ---------- BUTTON BAR ----------
 def set_project(project):
     global selected_project, response_cache
@@ -649,6 +674,51 @@ new_chat_button = tk.Button(
     cursor="hand2"
 )
 new_chat_button.pack(side="left", padx=(0, 10))
+
+safety_status_label = tk.Label(
+    button_frame,
+    text="SAFETY: ACTIVE",
+    font=("Segoe UI", 10, "bold"),
+    fg="#16a34a",
+    bg="#f4f7fb"
+)
+safety_status_label.pack(side="left", padx=(10, 10))
+
+
+kill_switch_button = tk.Button(
+    button_frame,
+    text="KILL SWITCH",
+    command=activate_kill_switch_ui,
+    font=("Segoe UI", 10, "bold"),
+    bg="#dc2626",
+    fg="white",
+    activebackground="#b91c1c",
+    activeforeground="white",
+    relief="flat",
+    bd=0,
+    padx=18,
+    pady=10,
+    cursor="hand2"
+)
+kill_switch_button.pack(side="left", padx=(0, 10))
+
+
+reset_safety_button = tk.Button(
+    button_frame,
+    text="RESET SAFETY",
+    command=reset_safety_ui,
+    font=("Segoe UI", 10, "bold"),
+    bg="#e8eef6",
+    fg="#10233f",
+    activebackground="#dce6f2",
+    activeforeground="#10233f",
+    relief="flat",
+    bd=0,
+    padx=18,
+    pady=10,
+    cursor="hand2"
+)
+reset_safety_button.pack(side="left", padx=(0, 10))
 # ---------- PROFESSIONAL BUTTON HOVER ----------
 
 def add_hover_effect(button, normal_bg, hover_bg):
@@ -724,6 +794,8 @@ results.insert(
 )
 
 set_mode("COUNCIL")
+
+update_safety_ui()
 
 root.mainloop()
 
