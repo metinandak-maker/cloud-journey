@@ -1,4 +1,6 @@
 from datetime import datetime
+import json
+from pathlib import Path
 
 
 class SafetyManager:
@@ -30,6 +32,7 @@ class SafetyManager:
     def __init__(self):
         self.killed = False
         self.audit_log = []
+        self.audit_file = Path(__file__).with_name("safety_audit.jsonl")
 
     def log(self, action, decision, details=""):
         event = {
@@ -40,7 +43,12 @@ class SafetyManager:
         }
 
         self.audit_log.append(event)
+
+        with self.audit_file.open("a", encoding="utf-8") as file:
+            file.write(json.dumps(event, ensure_ascii=False) + "\n")
+
         return event
+
 
     def check_action(self, action):
         if self.killed:
