@@ -404,6 +404,11 @@ except tk.TclError:
 # ---------- HEADER ----------
 header = tk.Frame(root, bg="#f4f7fb")
 header.pack(fill="x", padx=36, pady=(16, 8))
+atlas_image = tk.PhotoImage(file=os.path.join(os.path.dirname(os.path.abspath(__file__)), "atlas.png"))
+atlas_image = atlas_image.subsample(8, 8)
+atlas_label = tk.Label(header, image=atlas_image, bg="#f4f7fb")
+atlas_label.pack(side="left", padx=(0, 20))
+
 
 title = tk.Label(
     header,
