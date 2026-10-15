@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import scrolledtext, filedialog
 import threading
 import os
+import subprocess
 from datetime import datetime
 from safety import safety_manager
 
@@ -164,6 +165,26 @@ def show_single_result(mode, answer):
         results.see(tk.END)
 
     ask_button.config(state="normal")
+
+def speak_answer():
+    text = results.get("1.0", tk.END).strip()
+    if not text:
+        return
+
+    def speak():
+        script = (
+            "[Console]::InputEncoding = [System.Text.Encoding]::UTF8; "
+            "Add-Type -AssemblyName System.Speech; "
+            "$voice = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
+            "$text = [Console]::In.ReadToEnd(); "
+            "$voice.Speak($text)"
+        )
+        subprocess.run(
+            ["powershell.exe", "-NoProfile", "-Command", script],
+            input=text, encoding="utf-8", check=True
+        )
+
+    threading.Thread(target=speak, daemon=True).start()
 
 
 def copy_final_answer():
@@ -628,7 +649,19 @@ copy_button = tk.Button(
     cursor="hand2"
 )
 copy_button.pack(side="left", padx=(0, 10))
-
+speak_button = tk.Button(
+    button_frame,
+    text="SESLI OKU",
+    command=speak_answer,
+    font=("Segoe UI", 10, "bold"),
+    bg="#e8eef6",
+    fg="#10233f",
+    relief="flat",
+    padx=18,
+    pady=10,
+    cursor="hand2"
+)
+speak_button.pack(side="left", padx=(0, 10))
 save_button = tk.Button(
     button_frame,
     text="SAVE",
