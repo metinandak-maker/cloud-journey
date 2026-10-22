@@ -7,7 +7,7 @@ from datetime import datetime
 from safety import safety_manager
 
 
-from engine import run_council, ask_atlas, ask_claude, ask_grok, ask_teacher
+from engine import run_council, ask_atlas, ask_claude, ask_grok, ask_teacher, teacher_history
 
 
 last_final_answer = ""
@@ -244,6 +244,10 @@ def new_chat():
     global last_final_answer
 
     last_final_answer = ""
+
+
+
+    teacher_history.clear()
 
     for mode in response_cache:
         response_cache[mode] = ""

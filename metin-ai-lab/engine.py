@@ -36,7 +36,7 @@ def ask_atlas(prompt):
     except Exception as error:
         return f"ATLAS ERROR: {error}"
 
-
+teacher_history = []
 def ask_teacher(prompt):
     teacher_prompt = f"""
 You are TEACHER MODE inside Metin AI Lab.
@@ -53,12 +53,17 @@ Rules:
 7. Increase difficulty gradually.
 8. When the lesson is complete, give a short summary and next step.
 
-Student message:
+Previous conversation:
+{chr(10).join(teacher_history)}
 
+Student message:
 {prompt}
 """
 
-    return ask_atlas(teacher_prompt)
+    answer = ask_atlas(teacher_prompt)
+    if not answer.startswith(("ATLAS ERROR:", "SAFETY BLOCK:")):
+        teacher_history.append(f"Student: {prompt}\nTeacher: {answer}")
+    return answer
 
 
 
