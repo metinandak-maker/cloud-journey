@@ -1,0 +1,40 @@
+Day 17 - Bash Conditions and Input Validation
+
+if
+Bir kosul dogruysa belirli bir komutu calistirir.
+
+elif
+Ilk if dogru degilse baska bir kosulu kontrol eder.
+
+else
+Yukaridaki kosullar dogru degilse calisir.
+
+-ge
+Buyuk veya esit demektir.
+Ornek: 45 -ge 30 -> dogru.
+
+read -r -p
+Kullanicidan bilgi alir ve cevabi bir degiskene kaydeder.
+
+Input Validation
+Kullanicinin girdigi degerin dogru formatta olup olmadigini kontrol eder.
+Mesela sayi beklerken "hello" yazilirsa program bunu reddeder.
+
+exit 1
+Programi hata nedeniyle durdurur.
+
+Bugunku Mantik
+
+60 veya daha fazla dakika:
+Mukemmel!
+
+30 ile 59 dakika arasi:
+Hedef tamam!
+
+30 dakikadan az:
+Biraz daha calis!
+
+Troubleshooting
+Degisken adi yanlis yazilirsa program bos deger okuyabilir.
+Kosullar yukaridan asagi kontrol edilir.
+Ilk dogru kosul calisir.
