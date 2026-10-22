@@ -7,7 +7,7 @@ from datetime import datetime
 from safety import safety_manager
 
 
-from engine import run_council, ask_atlas, ask_claude, ask_grok
+from engine import run_council, ask_atlas, ask_claude, ask_grok, ask_teacher
 
 
 last_final_answer = ""
@@ -27,7 +27,8 @@ project_response_cache = {
         "COUNCIL": "",
         "ATLAS": "",
         "CLAUDE": "",
-        "GROK": ""
+        "GROK": "",
+        "TEACHER": ""
     }
     for project in projects
 }
@@ -135,6 +136,8 @@ def run_selected_mode(question, mode):
             answer = ask_claude(question)
         elif mode == "GROK":
             answer = ask_grok(question)
+        elif mode == "TEACHER":
+            answer = ask_teacher(question)
         else:
             answer = "Unknown AI mode."
 
@@ -469,7 +472,7 @@ def set_mode(mode):
     ask_button.config(text=f"ASK {mode}")
 
 
-for mode in ("COUNCIL", "ATLAS", "CLAUDE", "GROK"):
+for mode in ("COUNCIL", "ATLAS", "CLAUDE", "GROK","TEACHER"):
     btn = tk.Button(
         mode_frame,
         text=mode,
