@@ -38,3 +38,31 @@ Troubleshooting
 Degisken adi yanlis yazilirsa program bos deger okuyabilir.
 Kosullar yukaridan asagi kontrol edilir.
 Ilk dogru kosul calisir.
+
+
+--- Cikis kodlari ve komut baglaclari ---
+
+$? son calisan komutun cikis kodunu tutar.
+echo $? ile bu kodu gorebilirim.
+0 basari, sifirdan farkli kodlar basarisizlik bildirir.
+exit 1 scripti durdurur ve 1 kodunu dondurur.
+
+&& soldaki komut basariliysa sagdakini calistirir.
+|| soldaki komut basarisizsa sagdakini calistirir.
+
+bash study-check.sh
+Scripti calistirir.
+
+test -f study-check.sh
+Yolun mevcut bir normal dosya olup olmadigini kontrol eder.
+Dosyayi calistirmaz, kendisi ekrana mesaj yazmaz.
+
+test -f study-check.sh && echo "Calismaya hazir."
+Dosya varsa mesaji yazdirir.
+
+test -f olmayan.txt || echo "Dosya bulunamadi."
+Dosya yoksa mesaji yazdirir.
+
+Onemli: 10 dakika hedefin altinda olsa da gecerli girdidir.
+Script hatasiz tamamlanir ve 0 dondurur.
+"merhaba" sayi olmadigi icin exit 1 ile durur.
