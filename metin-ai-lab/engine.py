@@ -1,40 +1,115 @@
+"""Shared Council engine. SDK clients are created only when requested."""
 import os
-from dotenv import load_dotenv
-from openai import OpenAI
-from anthropic import Anthropic
+import math
+from request_state import cancellable
 from safety import safety_manager
 
-load_dotenv()
 
-openai_client = OpenAI(
-    api_key=os.getenv("OPENAI_API_KEY")
-)
+class ModelError(Exception):
+    """A failed operation, never model-generated answer text."""
+    def __init__(self, provider, code, message):
+        self.provider = provider
+        self.code = code
+        super().__init__(f"{provider}: {message}")
 
-anthropic_client = Anthropic(
-    api_key=os.getenv("ANTHROPIC_API_KEY")
-)
 
-grok_client = OpenAI(
-    api_key=os.getenv("XAI_API_KEY"),
-    base_url="https://api.x.ai/v1"
-)
+PROVIDERS = {
+    "ATLAS": ("OPENAI_API_KEY", "ATLAS_MODEL", "gpt-5.6"),
+    "CLAUDE": ("ANTHROPIC_API_KEY", "CLAUDE_MODEL", "claude-sonnet-5"),
+    "GROK": ("XAI_API_KEY", "GROK_MODEL", "grok-4.6"),
+}
+
+
+def configuration(provider):
+    # dotenv is optional when credentials are supplied through the environment.
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        pass
+    else:
+        load_dotenv()
+    key_name, model_name, default_model = PROVIDERS[provider]
+    key = os.getenv(key_name, "").strip()
+    if not key:
+        raise ModelError(provider, "configuration", f"Set {key_name} before using this mode.")
+    model = os.getenv(model_name, default_model).strip()
+    try:
+        timeout = float(os.getenv("AI_TIMEOUT_SECONDS", "60"))
+        if not math.isfinite(timeout) or timeout <= 0:
+            raise ValueError()
+    except ValueError:
+        raise ModelError(provider, "configuration", "AI_TIMEOUT_SECONDS must be a positive finite number.") from None
+    if not model:
+        raise ModelError(provider, "configuration", f"{model_name} cannot be empty.")
+    return key, model, timeout
+
+
+def make_client(provider, key, timeout):
+    try:
+        if provider == "CLAUDE":
+            from anthropic import Anthropic
+            return Anthropic(api_key=key, timeout=timeout, max_retries=0)
+        from openai import OpenAI
+        options = {"api_key": key, "timeout": timeout, "max_retries": 0}
+        if provider == "GROK":
+            options["base_url"] = "https://api.x.ai/v1"
+        return OpenAI(**options)
+    except ImportError:
+        raise ModelError(provider, "configuration", "Required provider SDK is not installed.") from None
+
+
+@cancellable
+def ask_model(provider, prompt):
+    try:
+        check = safety_manager.check_action("ask_model")
+    except OSError:
+        raise ModelError(provider, "audit", "Cannot write the safety audit log; request blocked.") from None
+    if not check["allowed"]:
+        raise ModelError(provider, "blocked", check["reason"])
+    key, model, timeout = configuration(provider)
+    try:
+        with make_client(provider, key, timeout) as client:
+            if provider == "ATLAS":
+                text = client.responses.create(model=model, input=prompt).output_text
+            elif provider == "CLAUDE":
+                response = client.messages.create(
+                    model=model, max_tokens=1600,
+                    messages=[{"role": "user", "content": prompt}])
+                text = "\n".join(block.text for block in response.content if block.type == "text")
+            else:
+                response = client.chat.completions.create(
+                    model=model, messages=[{"role": "user", "content": prompt}])
+                text = response.choices[0].message.content
+        if not isinstance(text, str) or not text.strip():
+            raise ModelError(provider, "empty_response", "Provider returned no text.")
+        return text
+    except ModelError:
+        raise
+    except Exception as error:
+        # Raw SDK errors can contain request data; do not display or archive them.
+        status = getattr(error, "status_code", None)
+        if isinstance(error, TimeoutError) or "timeout" in type(error).__name__.lower():
+            code, message = "timeout", "Request timed out. Please retry."
+        elif status in (401, 403):
+            code, message = "authentication", "Check your API key and account permissions."
+        elif status == 429:
+            code, message = "rate_limit", "Provider quota or rate limit reached. Try later."
+        else:
+            code, message = "provider_error", "Request failed. Check provider access and model configuration."
+        raise ModelError(provider, code, message) from None
 
 
 def ask_atlas(prompt):
-    check = safety_manager.check_action("ask_model")
+    return ask_model("ATLAS", prompt)
 
-    if not check["allowed"]:
-        return f"SAFETY BLOCK: {check['reason']}"
 
-    try:
-        response = openai_client.responses.create(
-            model="gpt-5.6",
-            input=prompt
-        )
-        return response.output_text
+def ask_claude(prompt):
+    return ask_model("CLAUDE", prompt)
 
-    except Exception as error:
-        return f"ATLAS ERROR: {error}"
+
+def ask_grok(prompt):
+    return ask_model("GROK", prompt)
+
 
 teacher_history = []
 def ask_teacher(prompt):
@@ -61,69 +136,12 @@ Student message:
 """
 
     answer = ask_atlas(teacher_prompt)
-    if not answer.startswith(("ATLAS ERROR:", "SAFETY BLOCK:")):
-        teacher_history.append(f"Student: {prompt}\nTeacher: {answer}")
+    teacher_history.append(f"Student: {prompt}\nTeacher: {answer}")
     return answer
 
 
 
-def ask_claude(prompt):
-    check = safety_manager.check_action("ask_model")
-
-    if not check["allowed"]:
-        return f"SAFETY BLOCK: {check['reason']}"
-
-    try:
-        response = anthropic_client.messages.create(
-            model="claude-sonnet-5",
-            max_tokens=1600,
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ]
-        )
-
-        text_parts = []
-
-        for block in response.content:
-            if block.type == "text":
-                text_parts.append(block.text)
-
-        if not text_parts:
-            return "CLAUDE ERROR: No text response returned."
-
-        return "\n".join(text_parts)
-
-    except Exception as error:
-        return f"CLAUDE ERROR: {error}"
-
-
-def ask_grok(prompt):
-    check = safety_manager.check_action("ask_model")
-
-    if not check["allowed"]:
-        return f"SAFETY BLOCK: {check['reason']}"
-
-    try:
-        response = grok_client.chat.completions.create(
-            model="grok-4.6",
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ]
-        )
-
-        return response.choices[0].message.content
-
-    except Exception as error:
-        return f"GROK ERROR: {error}"
-
-
-def run_council(question):
+def _run_council(question):
 
     if not question.strip():
         return {
@@ -270,3 +288,15 @@ FINAL RECOMMENDATION
         "grok_review": grok_review,
         "final": final_answer
     }
+
+
+def run_council(question):
+    if not question.strip():
+        return {"error": "Please enter a question.", "code": "input"}
+    try:
+        # Validate all credentials before spending on the first round.
+        for provider in PROVIDERS:
+            configuration(provider)
+        return _run_council(question)
+    except ModelError as error:
+        return {"error": str(error), "provider": error.provider, "code": error.code}

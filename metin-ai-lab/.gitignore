@@ -6,3 +6,12 @@ dist/
 *.spec
 council_archive.txt
 safety_audit.jsonl
+.env
+.env.*
+!.env.example
+.venv/
+.venv-wsl/
+__pycache__/
+*.pyc
+*.bak
+*.before-*

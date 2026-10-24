@@ -1,6 +1,9 @@
 import tkinter as tk
+from atlas_visual import AtlasVisual
 from tkinter import scrolledtext, filedialog
 import threading
+import queue
+from request_state import RequestState, RequestCancelled, request_scope
 import os
 import subprocess
 from datetime import datetime
@@ -9,6 +12,9 @@ from safety import safety_manager
 
 from engine import run_council, ask_atlas, ask_claude, ask_grok, ask_teacher, teacher_history
 
+
+requests = RequestState()
+completed = queue.Queue()
 
 last_final_answer = ""
 selected_mode = "COUNCIL"
@@ -95,6 +101,8 @@ def stop_thinking_animation(mode=None, set_ready=True):
 
 
 def ask_council():
+    if requests.busy or safety_manager.killed:
+        return
     question = question_box.get("1.0", tk.END).strip()
 
     if not question:
@@ -106,6 +114,7 @@ def ask_council():
     results.delete("1.0", tk.END)
 
     mode = selected_mode
+    request = requests.start(question, selected_project, mode)
 
     if mode == "COUNCIL":
         results.insert(tk.END, "Council is thinking...\n")
@@ -117,37 +126,49 @@ def ask_council():
 
     thread = threading.Thread(
         target=run_selected_mode,
-        args=(question, mode),
+        args=(request,),
         daemon=True
     )
     thread.start()
 
 
-def run_selected_mode(question, mode):
+def run_selected_mode(request):
     try:
-        if mode == "COUNCIL":
-            response = run_council(question)
-            root.after(0, show_results, response)
-            return
-
-        if mode == "ATLAS":
-            answer = ask_atlas(question)
-        elif mode == "CLAUDE":
-            answer = ask_claude(question)
-        elif mode == "GROK":
-            answer = ask_grok(question)
-        elif mode == "TEACHER":
-            answer = ask_teacher(question)
-        else:
-            answer = "Unknown AI mode."
-
-        root.after(0, show_single_result, mode, answer)
-
+        with request_scope(request.cancelled):
+            handlers = {"COUNCIL": run_council, "ATLAS": ask_atlas,
+                        "CLAUDE": ask_claude, "GROK": ask_grok,
+                        "TEACHER": ask_teacher}
+            answer = handlers[request.mode](request.question)
+        completed.put((request, answer, None))
+    except RequestCancelled:
+        completed.put((request, None, "Cancelled"))
     except Exception as error:
-        root.after(0, show_single_result, mode, f"ERROR: {error}")
+        completed.put((request, None, f"ERROR: {error}"))
 
 
-def show_single_result(mode, answer):
+def poll_results():
+    try:
+        while True:
+            request, answer, error = completed.get_nowait()
+            if not requests.finish(request):
+                continue
+            try:
+                if not request.cancelled.is_set() and not safety_manager.killed:
+                    if request.mode == "COUNCIL" and error is None:
+                        show_results(answer, request)
+                    else:
+                        show_single_result(request.mode, error or answer, request)
+            except Exception as error:
+                status_label.config(text=f"Result error: {error}", fg="#dc2626")
+            finally:
+                stop_thinking_animation(set_ready=False)
+                update_safety_ui()
+    except queue.Empty:
+        pass
+    root.after(50, poll_results)
+
+
+def show_single_result(mode, answer, request):
     global last_final_answer
 
     stop_thinking_animation(mode)
@@ -160,14 +181,14 @@ def show_single_result(mode, answer):
         f"{answer}"
     )
 
-    response_cache[mode] = output
+    project_response_cache[request.project][mode] = output
 
-    if selected_mode == mode:
+    if selected_mode == mode and selected_project == request.project:
         results.delete("1.0", tk.END)
         results.insert(tk.END, output)
         results.see(tk.END)
 
-    ask_button.config(state="normal")
+    update_safety_ui()
 
 def speak_answer():
     text = results.get("1.0", tk.END).strip()
@@ -247,6 +268,8 @@ def new_chat():
 
 
 
+    requests.cancel()
+    stop_thinking_animation(set_ready=False)
     teacher_history.clear()
 
     for mode in response_cache:
@@ -316,26 +339,30 @@ def show_history():
     history_box.see(tk.END)
 
 
-def show_results(council):
+def show_results(council, request):
     global last_final_answer
 
     stop_thinking_animation("COUNCIL")
     last_final_answer = council.get("final", "")
 
-    question = question_box.get("1.0", tk.END).strip()
+    question = request.question
 
     if last_final_answer:
-        archive_result(question, last_final_answer)
+        try:
+            archive_result(question, last_final_answer)
+        except OSError as error:
+            last_final_answer += f"\n\nArchive failed: {error}"
+            council = dict(council, final=last_final_answer)
 
     if "error" in council:
         error_output = str(council["error"])
-        response_cache["COUNCIL"] = error_output
+        project_response_cache[request.project]["COUNCIL"] = error_output
 
-        if selected_mode == "COUNCIL":
+        if selected_mode == "COUNCIL" and selected_project == request.project:
             results.delete("1.0", tk.END)
             results.insert(tk.END, error_output)
 
-        ask_button.config(state="normal")
+        update_safety_ui()
         return
 
     output = f"""
@@ -390,14 +417,14 @@ GROK  ?  REVIEW
 {council["final"]}
 """
 
-    response_cache["COUNCIL"] = output
+    project_response_cache[request.project]["COUNCIL"] = output
 
-    if selected_mode == "COUNCIL":
+    if selected_mode == "COUNCIL" and selected_project == request.project:
         results.delete("1.0", tk.END)
         results.insert(tk.END, output)
         results.see(tk.END)
 
-    ask_button.config(state="normal")
+    update_safety_ui()
 
 
 root = tk.Tk()
@@ -432,10 +459,27 @@ except tk.TclError:
 # ---------- HEADER ----------
 header = tk.Frame(root, bg="#f4f7fb")
 header.pack(fill="x", padx=36, pady=(16, 8))
-atlas_image = tk.PhotoImage(file=os.path.join(os.path.dirname(os.path.abspath(__file__)), "atlas.png"))
-atlas_image = atlas_image.subsample(8, 8)
-atlas_label = tk.Label(header, image=atlas_image, bg="#f4f7fb")
-atlas_label.pack(side="left", padx=(0, 20))
+def atlas_visual_state():
+    if safety_manager.killed:
+        return "killed"
+    if requests.active is not None:
+        return "cancelled" if requests.active.cancelled.is_set() else "thinking"
+    return "ready"
+
+
+atlas_visual = AtlasVisual(
+    header, atlas_visual_state,
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "atlas.png")
+)
+atlas_visual.pack(side="left", padx=(0, 20))
+
+motion_enabled = tk.BooleanVar(value=True)
+motion_toggle = tk.Checkbutton(
+    header, text="Animation", variable=motion_enabled,
+    command=lambda: atlas_visual.set_motion(motion_enabled.get()),
+    bg="#f4f7fb", fg="#52657d", activebackground="#f4f7fb",
+    font=("Segoe UI", 9), relief="flat")
+motion_toggle.pack(side="right", anchor="n")
 
 
 title = tk.Label(
@@ -472,7 +516,10 @@ def set_mode(mode):
         else:
             button.config(bg="#e8eef6", fg="#10233f")
 
-    status_label.config(text=f"{mode} • READY")
+    cached = response_cache.get(mode, "")
+    results.delete("1.0", tk.END)
+    results.insert(tk.END, cached or f"{selected_project} / {mode} ready.")
+    status_label.config(text=f"{mode} • {'BUSY' if requests.busy else 'READY'}")
     ask_button.config(text=f"ASK {mode}")
 
 
@@ -540,10 +587,12 @@ def update_safety_ui():
             text="SAFETY: ACTIVE",
             fg="#16a34a"
         )
-        ask_button.config(state="normal")
+        ask_button.config(state="disabled" if requests.busy else "normal")
 
 
 def activate_kill_switch_ui():
+    requests.cancel()
+    stop_thinking_animation(set_ready=False)
     safety_manager.activate_kill_switch()
     update_safety_ui()
 
@@ -842,7 +891,11 @@ set_mode("COUNCIL")
 
 update_safety_ui()
 
+def close_app():
+    atlas_visual.stop()
+    requests.cancel()
+    root.destroy()
+
+root.protocol("WM_DELETE_WINDOW", close_app)
+root.after(50, poll_results)
 root.mainloop()
-
-
-
