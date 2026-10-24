@@ -1,3 +1,4 @@
+import json
 import tkinter as tk
 from atlas_visual import AtlasVisual
 from tkinter import scrolledtext, filedialog
@@ -517,6 +518,20 @@ def set_mode(mode):
             button.config(bg="#e8eef6", fg="#10233f")
 
     cached = response_cache.get(mode, "")
+    if mode == "TEACHER" and not cached:
+        try:
+            with open("student_data.json", "r") as file:
+                student = json.load(file)
+
+            cached = (
+                f"Welcome back, {student['name']}!\n\n"
+                f"Subject: {student['subject']}\n"
+                f"Level: {student['level']}\n"
+                f"Exam Score: {student['score']}"
+            )
+
+        except (FileNotFoundError, KeyError, json.JSONDecodeError):
+            cached = "Student profile not found."
     results.delete("1.0", tk.END)
     results.insert(tk.END, cached or f"{selected_project} / {mode} ready.")
     status_label.config(text=f"{mode} • {'BUSY' if requests.busy else 'READY'}")
