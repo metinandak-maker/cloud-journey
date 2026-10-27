@@ -1,15 +1,18 @@
 """Shared Council engine. SDK clients are created only when requested."""
 import os
 import math
+from time import monotonic
 from request_state import cancellable
 from safety import safety_manager
+from project_context import project_prompt
 
 
 class ModelError(Exception):
     """A failed operation, never model-generated answer text."""
-    def __init__(self, provider, code, message):
+    def __init__(self, provider, code, message, diagnostics=None):
         self.provider = provider
         self.code = code
+        self.diagnostics = diagnostics or {}
         super().__init__(f"{provider}: {message}")
 
 
@@ -41,7 +44,61 @@ def configuration(provider):
         raise ModelError(provider, "configuration", "AI_TIMEOUT_SECONDS must be a positive finite number.") from None
     if not model:
         raise ModelError(provider, "configuration", f"{model_name} cannot be empty.")
+    if provider == "CLAUDE":
+        claude_max_tokens()  # Council preflight must fail before any provider spends.
     return key, model, timeout
+
+
+def claude_max_tokens():
+    try:
+        value = int(os.getenv("CLAUDE_MAX_TOKENS", "1600"))
+        if not 1 <= value <= 128000:
+            raise ValueError()
+        return value
+    except ValueError:
+        raise ModelError("CLAUDE", "configuration",
+                         "CLAUDE_MAX_TOKENS must be an integer from 1 to 128000.") from None
+
+
+def parse_claude_response(response, max_tokens):
+    """Only fixed enums and numeric counts may enter diagnostics; never raw blocks."""
+    reasons = {"end_turn", "max_tokens", "stop_sequence", "tool_use", "pause_turn",
+               "refusal", "model_context_window_exceeded"}
+    reason = getattr(response, "stop_reason", None)
+    reason = reason if isinstance(reason, str) and reason in reasons else "unknown"
+    content = getattr(response, "content", None)
+    content = content if isinstance(content, (list, tuple)) else []
+    known_types = {"text", "thinking", "redacted_thinking", "tool_use", "server_tool_use"}
+    counts = {}
+    texts = []
+    for block in content:
+        kind = getattr(block, "type", None)
+        kind = kind if isinstance(kind, str) and kind in known_types else "other"
+        counts[kind] = counts.get(kind, 0) + 1
+        if kind == "text":
+            text = getattr(block, "text", None)
+            if isinstance(text, str) and text.strip():
+                texts.append(text)
+    usage = getattr(response, "usage", None)
+    diagnostics = {"stop_reason": reason, "block_counts": counts, "max_tokens": max_tokens}
+    for name in ("input_tokens", "output_tokens"):
+        value = getattr(usage, name, None)
+        if type(value) is int and value >= 0:
+            diagnostics[name] = value
+    summary = "; ".join(f"{key}={value}" for key, value in diagnostics.items())
+    if reason == "max_tokens":
+        code, message = "token_limit", "Output token limit reached; answer is incomplete. Consider CLAUDE_MAX_TOKENS or a shorter request."
+    elif reason == "model_context_window_exceeded":
+        code, message = "context_limit", "Context window limit reached; shorten the request."
+    elif reason == "refusal":
+        code, message = "refusal", "Provider declined this request."
+    elif reason not in {"end_turn", "stop_sequence"}:
+        code, message = "incomplete_response", "Provider did not complete a text answer. No automatic continuation was attempted."
+    elif not texts:
+        code, message = "empty_response", "Provider returned no text. No automatic retry was attempted."
+    else:
+        return "\n".join(texts)
+    raise ModelError("CLAUDE", code, f"{message} Diagnostics: {summary}", diagnostics)
 
 
 def make_client(provider, key, timeout):
@@ -72,10 +129,16 @@ def ask_model(provider, prompt):
             if provider == "ATLAS":
                 text = client.responses.create(model=model, input=prompt).output_text
             elif provider == "CLAUDE":
+                max_tokens = claude_max_tokens()
+                options = {}
+                # Sonnet 5 defaults to adaptive thinking, which shares this budget.
+                # Do not assume other model IDs accept the same thinking settings.
+                if model == "claude-sonnet-5":
+                    options["thinking"] = {"type": "disabled"}
                 response = client.messages.create(
-                    model=model, max_tokens=1600,
-                    messages=[{"role": "user", "content": prompt}])
-                text = "\n".join(block.text for block in response.content if block.type == "text")
+                    model=model, max_tokens=max_tokens,
+                    messages=[{"role": "user", "content": prompt}], **options)
+                text = parse_claude_response(response, max_tokens)
             else:
                 response = client.chat.completions.create(
                     model=model, messages=[{"role": "user", "content": prompt}])
@@ -89,9 +152,13 @@ def ask_model(provider, prompt):
         # Raw SDK errors can contain request data; do not display or archive them.
         status = getattr(error, "status_code", None)
         if isinstance(error, TimeoutError) or "timeout" in type(error).__name__.lower():
-            code, message = "timeout", "Request timed out. Please retry."
+            code, message = "timeout", f"Request timed out (SDK timeout: {timeout:g}s; automatic retries disabled)."
         elif status in (401, 403):
             code, message = "authentication", "Check your API key and account permissions."
+        elif provider == "CLAUDE" and status == 400:
+            code, message = "invalid_request", "Request rejected. Check CLAUDE_MODEL, CLAUDE_MAX_TOKENS and model parameter limits."
+        elif provider == "CLAUDE" and status == 404:
+            code, message = "model_not_found", "Model or endpoint not found. Check CLAUDE_MODEL and account access."
         elif status == 429:
             code, message = "rate_limit", "Provider quota or rate limit reached. Try later."
         else:
@@ -112,7 +179,10 @@ def ask_grok(prompt):
 
 
 teacher_history = []
-def ask_teacher(prompt):
+teacher_histories = {"General": teacher_history}
+def ask_teacher(prompt, project="General", *, remember=True):
+    # UI requests commit on the main thread only after cancellation checks.
+    history = list(teacher_histories.setdefault(project, []))
     teacher_prompt = f"""
 You are TEACHER MODE inside Metin AI Lab.
 
@@ -129,19 +199,43 @@ Rules:
 8. When the lesson is complete, give a short summary and next step.
 
 Previous conversation:
-{chr(10).join(teacher_history)}
+{chr(10).join(history)}
 
 Student message:
 {prompt}
 """
 
     answer = ask_atlas(teacher_prompt)
-    teacher_history.append(f"Student: {prompt}\nTeacher: {answer}")
+    if remember:
+        teacher_histories.setdefault(project, []).append(f"Student: {prompt}\nTeacher: {answer}")
     return answer
 
 
 
-def _run_council(question):
+COUNCIL_STAGES = (
+    ("atlas", "ATLAS / ANALYSIS"), ("claude", "CLAUDE / ANALYSIS"),
+    ("grok", "GROK / ANALYSIS"), ("atlas_review", "ATLAS / REVIEW"),
+    ("claude_review", "CLAUDE / REVIEW"), ("grok_review", "GROK / REVIEW"),
+    ("final", "ATLAS / FINAL"),
+)
+
+
+def _run_council(question, project=None, *, progress=None, partial=None):
+    partial = partial if partial is not None else {}
+    started = monotonic()
+
+    def call(key, provider, prompt):
+        index = next(i for i, stage in enumerate(COUNCIL_STAGES) if stage[0] == key)
+        partial["stage"] = key
+        if progress:
+            progress({"stage": key, "label": COUNCIL_STAGES[index][1],
+                      "number": index + 1, "total": 7, "started": started,
+                      "stage_started": monotonic(),
+                      "answers": {k: partial[k] for k, _ in COUNCIL_STAGES if k in partial}})
+        answer = {"ATLAS": ask_atlas, "CLAUDE": ask_claude, "GROK": ask_grok}[provider](prompt)
+        partial[key] = answer
+        return answer
+
 
     if not question.strip():
         return {
@@ -152,9 +246,11 @@ def _run_council(question):
     # ROUND 1
     # -----------------------------
 
-    atlas_answer = ask_atlas(question)
-    claude_answer = ask_claude(question)
-    grok_answer = ask_grok(question)
+    # Capture evidence once, keeping all seven calls on the same project snapshot.
+    contexts = {p: project_prompt(project, p, "") if project else "" for p in PROVIDERS}
+    atlas_answer = call("atlas", "ATLAS", contexts["ATLAS"] + question)
+    claude_answer = call("claude", "CLAUDE", contexts["CLAUDE"] + question)
+    grok_answer = call("grok", "GROK", contexts["GROK"] + question)
 
     # -----------------------------
     # ROUND 2
@@ -238,9 +334,9 @@ Identify:
 Be concise and practical.
 """
 
-    atlas_review = ask_atlas(atlas_review_prompt)
-    claude_review = ask_claude(claude_review_prompt)
-    grok_review = ask_grok(grok_review_prompt)
+    atlas_review = call("atlas_review", "ATLAS", contexts["ATLAS"] + atlas_review_prompt)
+    claude_review = call("claude_review", "CLAUDE", contexts["CLAUDE"] + claude_review_prompt)
+    grok_review = call("grok_review", "GROK", contexts["GROK"] + grok_review_prompt)
 
     # -----------------------------
     # ROUND 3 - FINAL JUDGE
@@ -277,7 +373,7 @@ Finish with:
 FINAL RECOMMENDATION
 """
 
-    final_answer = ask_atlas(judge_prompt)
+    final_answer = call("final", "ATLAS", contexts["ATLAS"] + judge_prompt)
 
     return {
         "atlas": atlas_answer,
@@ -290,13 +386,17 @@ FINAL RECOMMENDATION
     }
 
 
-def run_council(question):
+def run_council(question, project=None, *, progress=None):
     if not question.strip():
         return {"error": "Please enter a question.", "code": "input"}
+    partial = {}
     try:
         # Validate all credentials before spending on the first round.
         for provider in PROVIDERS:
             configuration(provider)
-        return _run_council(question)
+        return _run_council(question, project, progress=progress, partial=partial)
     except ModelError as error:
-        return {"error": str(error), "provider": error.provider, "code": error.code}
+        result = dict(partial, error=str(error), provider=error.provider, code=error.code)
+        if error.diagnostics:
+            result["diagnostics"] = error.diagnostics
+        return result

@@ -12,12 +12,14 @@ def gui_functions():
     functions = [n for n in tree.body if isinstance(n, ast.FunctionDef)]
     env = {'tk': SimpleNamespace(END='end'), 'requests': RequestState(),
            'completed': queue.Queue(), 'queue': queue,
+           'council_progress': queue.Queue(), 'active_council_progress': None,
+           'monotonic': lambda: 100.0,
            'safety_manager': SimpleNamespace(killed=False),
            'root': Mock(), 'ask_button': Mock(), 'safety_status_label': Mock(),
            'status_label': Mock(), 'results': Mock(), 'question_box': Mock(),
            'selected_mode': 'ATLAS', 'selected_project': 'Other',
            'project_response_cache': {'Original': {}, 'Other': {}},
-           'teacher_history': [], 'last_final_answer': ''}
+           'teacher_history': [], 'teacher_histories': {}, 'last_final_answer': ''}
     exec(compile(ast.Module(body=functions, type_ignores=[]), 'app.py', 'exec'), env)
     env['stop_thinking_animation'] = Mock()
     return env
@@ -88,7 +90,7 @@ class RequestTests(unittest.TestCase):
         answer = dict.fromkeys(['atlas', 'claude', 'grok', 'atlas_review',
                                'claude_review', 'grok_review', 'final'], 'answer')
         e['show_results'](answer, request)
-        e['archive_result'].assert_called_once_with('original question', 'answer')
+        e['archive_result'].assert_called_once_with('original question', 'answer', 'Original', answer)
         e['question_box'].get.assert_not_called()
 
     def test_archive_failure_does_not_lose_answer_or_lock_ui(self):
@@ -101,6 +103,34 @@ class RequestTests(unittest.TestCase):
         e['poll_results']()
         self.assertIn('Archive failed', e['project_response_cache']['Original']['COUNCIL'])
         e['ask_button'].config.assert_called_with(state='normal')
+
+    def test_partial_failure_is_cached_archived_and_exportable(self):
+        e = gui_functions()
+        e['archive_result'] = Mock()
+        request = e['requests'].start('q', 'Original', 'COUNCIL')
+        answer = {'atlas': 'preserved answer', 'error': 'timeout', 'stage': 'claude'}
+        e['completed'].put((request, answer, None))
+        e['poll_results']()
+        self.assertIn('preserved answer', e['project_response_cache']['Original']['COUNCIL'])
+        self.assertIn('claude', e['last_final_answer'])
+        e['archive_result'].assert_called_once_with('q', '', 'Original', answer)
+        self.assertFalse(e['requests'].busy)
+
+    def test_progress_is_owned_by_request_and_elapsed_is_live(self):
+        e = gui_functions()
+        request = e['requests'].start('q', 'Original', 'COUNCIL')
+        data = dict(number=2, total=7, label='CLAUDE / ANALYSIS',
+                    started=80.0, stage_started=95.0, answers={'atlas': 'done'})
+        e['council_progress'].put((request, data))
+        e['poll_council_progress']()
+        text = e['thinking_status']('COUNCIL', '.')
+        self.assertIn('2/7', text)
+        self.assertIn('Stage 5s | Total 20s', text)
+        self.assertIn('done', e['project_response_cache']['Original']['COUNCIL'])
+        e['requests'].cancel()
+        e['council_progress'].put((request, dict(data, answers={'atlas': 'stale'})))
+        e['poll_council_progress']()
+        self.assertNotIn('stale', e['project_response_cache']['Original']['COUNCIL'])
 
     def test_reset_during_request_keeps_ask_disabled(self):
         e = gui_functions()

@@ -45,7 +45,13 @@ class EngineTests(unittest.TestCase):
             with self.subTest(stage=failed_stage):
                 results = ['answer'] * failed_stage + [engine.ModelError('ATLAS', 'timeout', 'timed out')]
                 with patch.object(engine, 'ask_model', side_effect=results) as ask:
-                    result = engine.run_council('question')
+                    events = []
+                    result = engine.run_council('question', progress=events.append)
+                keys = [key for key, _ in engine.COUNCIL_STAGES]
+                self.assertEqual(result['stage'], keys[failed_stage])
+                self.assertEqual([result[k] for k in keys[:failed_stage]], ['answer'] * failed_stage)
+                self.assertEqual(len(events), failed_stage + 1)
+                self.assertEqual(len(events[-1]['answers']), failed_stage)
                 self.assertNotIn('final', result)
                 self.assertEqual(result['code'], 'timeout')
                 self.assertEqual(ask.call_count, failed_stage + 1)
@@ -115,6 +121,113 @@ class EngineTests(unittest.TestCase):
                 engine.ask_atlas('question')
             self.assertEqual(caught.exception.code, code)
             self.assertNotIn('sensitive', str(caught.exception))
+
+    def claude_response(self, content, reason='end_turn'):
+        self.client.messages.create.return_value = SimpleNamespace(
+            content=content, stop_reason=reason,
+            usage=SimpleNamespace(input_tokens=100, output_tokens=1600))
+
+    def test_claude_parses_all_text_blocks_and_ignores_thinking(self):
+        self.claude_response([SimpleNamespace(type='thinking', thinking='PRIVATE'),
+                             SimpleNamespace(type='text', text='first'),
+                             SimpleNamespace(type='text', text='second')])
+        self.assertEqual(engine.ask_claude('PRIVATE PROMPT'), 'first\nsecond')
+        kwargs = self.client.messages.create.call_args.kwargs
+        self.assertEqual(kwargs['model'], 'claude-sonnet-5')
+        self.assertEqual(kwargs['max_tokens'], 1600)
+        self.assertEqual(kwargs['thinking'], {'type': 'disabled'})
+        self.assertEqual(self.client.messages.create.call_count, 1)
+
+    def test_claude_empty_completed_responses_have_safe_diagnostics(self):
+        for blocks in ([], None, [SimpleNamespace(type='text', text='  ')],
+                       [SimpleNamespace(type='thinking', thinking='PRIVATE')],
+                       [SimpleNamespace(type='PRIVATE', text='PRIVATE')],
+                       [SimpleNamespace(type='text', text=None)]):
+            with self.subTest(blocks=blocks):
+                self.claude_response(blocks)
+                with self.assertRaises(engine.ModelError) as caught:
+                    engine.ask_claude('PRIVATE PROMPT')
+                error = caught.exception
+                self.assertEqual(error.code, 'empty_response')
+                self.assertEqual(error.diagnostics['stop_reason'], 'end_turn')
+                self.assertEqual(error.diagnostics['output_tokens'], 1600)
+                self.assertNotIn('PRIVATE', str(error))
+                self.assertNotIn('test-key', str(error))
+
+    def test_claude_token_limit_rejects_empty_and_partial_answers_without_retry(self):
+        for blocks in ([], [SimpleNamespace(type='thinking', thinking='PRIVATE')],
+                       [SimpleNamespace(type='text', text='PRIVATE PARTIAL')]):
+            self.client.messages.create.reset_mock()
+            self.claude_response(blocks, 'max_tokens')
+            with self.assertRaises(engine.ModelError) as caught:
+                engine.ask_claude('PRIVATE PROMPT')
+            self.assertEqual(caught.exception.code, 'token_limit')
+            self.assertIn('CLAUDE_MAX_TOKENS', str(caught.exception))
+            self.assertNotIn('PRIVATE', str(caught.exception))
+            self.assertEqual(self.client.messages.create.call_count, 1)
+
+    def test_claude_nonfinal_stop_reasons_are_failures(self):
+        for reason, code in [('model_context_window_exceeded', 'context_limit'),
+                             ('refusal', 'refusal'), ('tool_use', 'incomplete_response'),
+                             ('pause_turn', 'incomplete_response'),
+                             ('PRIVATE', 'incomplete_response'), (None, 'incomplete_response')]:
+            self.claude_response([SimpleNamespace(type='text', text='PRIVATE')], reason)
+            with self.assertRaises(engine.ModelError) as caught:
+                engine.ask_claude('q')
+            self.assertEqual(caught.exception.code, code)
+            self.assertNotIn('PRIVATE', str(caught.exception))
+
+    def test_claude_custom_budget_and_model_do_not_assume_thinking_support(self):
+        os.environ['CLAUDE_MODEL'] = 'claude-sonnet-5-5'
+        os.environ['CLAUDE_MAX_TOKENS'] = '2400'
+        self.claude_response([SimpleNamespace(type='text', text='answer')])
+        self.assertEqual(engine.ask_claude('q'), 'answer')
+        kwargs = self.client.messages.create.call_args.kwargs
+        self.assertEqual(kwargs['max_tokens'], 2400)
+        self.assertEqual(kwargs['model'], 'claude-sonnet-5-5')
+        self.assertNotIn('thinking', kwargs)
+
+    def test_claude_invalid_budget_blocks_council_preflight(self):
+        for value in ['0', '-1', '128001', '1.5', 'nan', 'PRIVATE']:
+            os.environ['CLAUDE_MAX_TOKENS'] = value
+            result = engine.run_council('q')
+            self.assertEqual(result['code'], 'configuration')
+            self.assertNotIn('PRIVATE', result['error'])
+        self.factory.assert_not_called()
+
+    def test_claude_http_errors_do_not_expose_response_body(self):
+        for status, code in [(400, 'invalid_request'), (404, 'model_not_found')]:
+            error = RuntimeError('PRIVATE PROMPT test-key')
+            error.status_code = status
+            self.client.messages.create.side_effect = error
+            with self.assertRaises(engine.ModelError) as caught:
+                engine.ask_claude('PRIVATE PROMPT')
+            self.assertEqual(caught.exception.code, code)
+            self.assertNotIn('PRIVATE', str(caught.exception))
+            self.assertNotIn('test-key', str(caught.exception))
+
+    def test_claude_token_limit_stops_council_with_diagnostics(self):
+        self.claude_response([], 'max_tokens')
+        result = engine.run_council('PRIVATE PROMPT')
+        self.assertEqual(result['code'], 'token_limit')
+        self.assertEqual(result['diagnostics']['stop_reason'], 'max_tokens')
+        self.assertNotIn('final', result)
+        self.assertNotIn('PRIVATE', str(result))
+        self.assertEqual(self.factory.call_count, 2)
+
+    def test_claude_kill_and_cancellation_preserved(self):
+        self.safety.check_action.return_value = {'allowed': False, 'reason': 'Killed'}
+        with self.assertRaises(engine.ModelError):
+            engine.ask_claude('q')
+        self.factory.assert_not_called()
+        self.safety.check_action.return_value = {'allowed': True}
+        event = Event()
+        def response(**kwargs):
+            event.set()
+            return SimpleNamespace(content=[SimpleNamespace(type='text', text='late')], stop_reason='end_turn')
+        self.client.messages.create.side_effect = response
+        with self.assertRaises(RequestCancelled), request_scope(event):
+            engine.ask_claude('q')
 
     def test_cli_uses_shared_engine_and_exit_status(self):
         import main

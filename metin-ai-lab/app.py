@@ -1,9 +1,10 @@
 import json
 import tkinter as tk
 from atlas_visual import AtlasVisual
-from tkinter import scrolledtext, filedialog
+from tkinter import scrolledtext, filedialog, messagebox
 import threading
 import queue
+from time import monotonic
 from request_state import RequestState, RequestCancelled, request_scope
 import os
 import subprocess
@@ -11,23 +12,34 @@ from datetime import datetime
 from safety import safety_manager
 
 
-from engine import run_council, ask_atlas, ask_claude, ask_grok, ask_teacher, teacher_history
+from engine import run_council, ask_atlas, ask_claude, ask_grok, ask_teacher, teacher_history, teacher_histories
+from project_context import PROJECTS, GAME, ROLES, project_prompt, save_session, read_history
+from teacher_store import (TeacherHistoryError, load_active_history, save_teacher_history,
+                           start_new_lesson, list_teacher_sessions, resume_teacher_session,
+                           format_teacher_history)
+
+history_errors = {}
+# Restore without replacing the General list imported by existing integrations.
+for project in PROJECTS:
+    try:
+        teacher_histories.setdefault(project, [])[:] = load_active_history(project)
+    except (OSError, TeacherHistoryError) as error:
+        history_errors[project] = str(error)
+
 
 
 requests = RequestState()
 completed = queue.Queue()
+council_progress = queue.Queue()
+active_council_progress = None
 
 last_final_answer = ""
 selected_mode = "COUNCIL"
 
 selected_project = "General"
 
-projects = [
-    "General",
-    "Cloud Journey",
-    "Pip",
-    "Website Client"
-]
+# Includes KEBAB MAN ON CRIME; project definitions live in project_context.py.
+projects = list(PROJECTS)
 
 project_response_cache = {
     project: {
@@ -48,6 +60,34 @@ thinking_mode = None
 thinking_step = 0
 
 
+def thinking_status(mode, dots):
+    event = active_council_progress
+    if mode == "COUNCIL" and event and requests.active is event[0]:
+        data = event[1]
+        now = monotonic()
+        return (f"COUNCIL {data['number']}/{data['total']} — {data['label']} | "
+                f"Stage {now - data['stage_started']:.0f}s | Total {now - data['started']:.0f}s")
+    return f"{mode}  ?  THINKING{dots}"
+
+
+def poll_council_progress():
+    global active_council_progress
+    try:
+        while True:
+            request, data = council_progress.get_nowait()
+            if requests.active is not request or request.cancelled.is_set() or safety_manager.killed:
+                continue
+            active_council_progress = (request, data)
+            output = "Council in progress — completed responses:\n\n" + "\n\n".join(
+                f"{key.upper()}\n{answer}" for key, answer in data['answers'].items())
+            project_response_cache[request.project]['COUNCIL'] = output
+            if selected_mode == 'COUNCIL' and selected_project == request.project:
+                results.delete('1.0', tk.END)
+                results.insert(tk.END, output)
+    except queue.Empty:
+        pass
+
+
 def start_thinking_animation(mode):
     global thinking_after_id, thinking_mode, thinking_step
 
@@ -66,7 +106,7 @@ def start_thinking_animation(mode):
 
         if selected_mode == mode:
             status_label.config(
-                text=f"{mode}  ?  THINKING{dots}",
+                text=thinking_status(mode, dots),
                 fg="#38bdf8"
             )
 
@@ -139,7 +179,13 @@ def run_selected_mode(request):
             handlers = {"COUNCIL": run_council, "ATLAS": ask_atlas,
                         "CLAUDE": ask_claude, "GROK": ask_grok,
                         "TEACHER": ask_teacher}
-            answer = handlers[request.mode](request.question)
+            if request.mode == "COUNCIL":
+                answer = run_council(request.question, project=request.project,
+                    progress=lambda data: council_progress.put((request, data)))
+            elif request.mode == "TEACHER":
+                answer = ask_teacher(request.question, project=request.project, remember=False)
+            else:
+                answer = handlers[request.mode](project_prompt(request.project, request.mode, request.question))
         completed.put((request, answer, None))
     except RequestCancelled:
         completed.put((request, None, "Cancelled"))
@@ -148,6 +194,7 @@ def run_selected_mode(request):
 
 
 def poll_results():
+    poll_council_progress()
     try:
         while True:
             request, answer, error = completed.get_nowait()
@@ -158,7 +205,7 @@ def poll_results():
                     if request.mode == "COUNCIL" and error is None:
                         show_results(answer, request)
                     else:
-                        show_single_result(request.mode, error or answer, request)
+                        show_single_result(request.mode, error or answer, request, success=error is None)
             except Exception as error:
                 status_label.config(text=f"Result error: {error}", fg="#dc2626")
             finally:
@@ -169,7 +216,7 @@ def poll_results():
     root.after(50, poll_results)
 
 
-def show_single_result(mode, answer, request):
+def show_single_result(mode, answer, request, success=True):
     global last_final_answer
 
     stop_thinking_animation(mode)
@@ -181,6 +228,19 @@ def show_single_result(mode, answer, request):
         f"==============================\n\n"
         f"{answer}"
     )
+
+    if mode == "TEACHER" and success:
+        history = teacher_histories.setdefault(request.project, [])
+        history.append(f"Student: {request.question}\nTeacher: {answer}")
+        try:
+            save_teacher_history(request.project, history)
+            history_errors.pop(request.project, None)
+        except (OSError, TeacherHistoryError) as error:
+            history_errors[request.project] = str(error)
+            messagebox.showwarning("Teacher not saved",
+                "The lesson is still in memory but could not be saved automatically. "
+                "Use SAVE to export it before closing.\n\n" + str(error))
+        output = format_teacher_history(request.project, history)
 
     project_response_cache[request.project][mode] = output
 
@@ -222,7 +282,11 @@ def copy_final_answer():
 
 
 def save_final_answer():
-    full_text = results.get("1.0", tk.END).strip()
+    if selected_mode == "TEACHER":
+        turns = teacher_histories.get(selected_project, [])
+        full_text = format_teacher_history(selected_project, turns) if turns else ""
+    else:
+        full_text = results.get("1.0", tk.END).strip()
 
     if not full_text:
         return
@@ -234,45 +298,33 @@ def save_final_answer():
     )
 
     if file_path:
-        with open(file_path, "w", encoding="utf-8") as file:
-            file.write(full_text)
+        try:
+            with open(file_path, "w", encoding="utf-8") as file:
+                file.write(full_text)
+        except OSError as error:
+            messagebox.showerror("Save failed", str(error))
 
 
-def archive_result(question, final_answer):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    archive_dir = os.path.join(
-        os.path.expanduser("~"),
-        "Documents",
-        "Metin AI Lab"
-    )
-    os.makedirs(archive_dir, exist_ok=True)
-
-    archive_path = os.path.join(
-        archive_dir,
-        "council_archive.txt"
-    )
-
-    with open(archive_path, "a", encoding="utf-8") as file:
-        file.write("\n" + "=" * 60 + "\n")
-        file.write(f"DATE: {timestamp}\n")
-        file.write(f"QUESTION: {question}\n\n")
-        file.write("FINAL ANSWER:\n")
-        file.write(final_answer)
-        file.write("\n")
+def archive_result(question, final_answer, project="General", council=None):
+    save_session(project, question, council or {"final": final_answer})
 
 
 def new_chat():
     global last_final_answer
 
+    if selected_mode == "TEACHER":
+        try:
+            start_new_lesson(selected_project, teacher_histories.get(selected_project, []))
+        except (OSError, TeacherHistoryError) as error:
+            messagebox.showerror("Could not start a new lesson",
+                                 "Your current lesson was kept.\n\n" + str(error))
+            return
+        teacher_histories.setdefault(selected_project, []).clear()
+        history_errors.pop(selected_project, None)
+
     last_final_answer = ""
-
-
-
     requests.cancel()
     stop_thinking_animation(set_ready=False)
-    teacher_history.clear()
-
     for mode in response_cache:
         response_cache[mode] = ""
 
@@ -284,17 +336,9 @@ def new_chat():
 
 
 def show_history():
-    archive_dir = os.path.join(
-        os.path.expanduser("~"),
-        "Documents",
-        "Metin AI Lab"
-    )
-
-    archive_path = os.path.join(
-        archive_dir,
-        "council_archive.txt"
-    )
-
+    if selected_mode == "TEACHER":
+        show_teacher_history()
+        return
     history_window = tk.Toplevel(root)
     history_window.title("METIN AI LAB - HISTORY")
     history_window.geometry("900x650")
@@ -302,7 +346,7 @@ def show_history():
 
     title = tk.Label(
         history_window,
-        text="COUNCIL HISTORY",
+        text=f"{selected_project} — COUNCIL HISTORY",
         font=("Arial", 18, "bold"),
         fg="#10233f",
         bg="#f4f7fb"
@@ -327,17 +371,76 @@ def show_history():
         pady=(0, 20)
     )
 
-    if not os.path.exists(archive_path):
-        history_box.insert(
-            tk.END,
-            "No archived Council results found yet."
-        )
-        return
-
-    with open(archive_path, "r", encoding="utf-8") as file:
-        history_box.insert(tk.END, file.read())
+    try:
+        history_box.insert(tk.END, read_history(selected_project))
+    except OSError:
+        history_box.insert(tk.END, "Could not read project history.")
 
     history_box.see(tk.END)
+
+
+
+def show_teacher_history():
+    project = selected_project
+    try:
+        sessions = list_teacher_sessions(project)
+    except (OSError, TeacherHistoryError) as error:
+        messagebox.showerror("Teacher history", str(error))
+        return
+    window = tk.Toplevel(root)
+    window.title(f"{project} — TEACHER HISTORY")
+    window.geometry("900x650")
+    window.minsize(600, 420)
+    tk.Label(window, text=f"{project} — TEACHER HISTORY",
+             font=("Arial", 18, "bold")).pack(pady=12)
+    tk.Label(window, text="Select a saved lesson, then Resume selected lesson.").pack()
+    choices = tk.Listbox(window, height=5, exportselection=False)
+    choices.pack(fill="x", padx=16, pady=8)
+    preview = scrolledtext.ScrolledText(window, wrap="word", font=("Segoe UI", 11))
+    preview.pack(fill="both", expand=True, padx=16, pady=8)
+    for session in sessions:
+        first = session["turns"][0].split("\n", 1)[0] if session["turns"] else "Empty lesson"
+        choices.insert(tk.END, f'{session["created"][:19]} UTC — {first[:75]}')
+
+    def show_preview(event=None):
+        selected = choices.curselection()
+        preview.config(state="normal")
+        preview.delete("1.0", tk.END)
+        if selected:
+            preview.insert(tk.END, format_teacher_history(project, sessions[selected[0]]["turns"]))
+        else:
+            preview.insert(tk.END, "No saved Teacher lessons yet.")
+        preview.config(state="disabled")
+
+    def resume():
+        selected = choices.curselection()
+        if not selected:
+            return
+        if requests.busy:
+            messagebox.showinfo("Teacher history", "Wait for the current request to finish.", parent=window)
+            return
+        try:
+            current = teacher_histories.get(project, [])
+            if current:
+                save_teacher_history(project, current)
+            turns = resume_teacher_session(project, sessions[selected[0]]["id"])
+        except (OSError, TeacherHistoryError) as error:
+            messagebox.showerror("Could not resume lesson", str(error), parent=window)
+            return
+        teacher_histories.setdefault(project, [])[:] = turns
+        history_errors.pop(project, None)
+        project_response_cache[project]["TEACHER"] = format_teacher_history(project, turns)
+        set_project(project)
+        set_mode("TEACHER")
+        question_box.delete("1.0", tk.END)
+        question_box.focus_set()
+        window.destroy()
+
+    choices.bind("<<ListboxSelect>>", show_preview)
+    tk.Button(window, text="Resume selected lesson", command=resume).pack(pady=(0, 12))
+    if sessions:
+        choices.selection_set(0)
+    show_preview()
 
 
 def show_results(council, request):
@@ -350,13 +453,26 @@ def show_results(council, request):
 
     if last_final_answer:
         try:
-            archive_result(question, last_final_answer)
+            archive_result(question, last_final_answer, request.project, council)
         except OSError as error:
             last_final_answer += f"\n\nArchive failed: {error}"
             council = dict(council, final=last_final_answer)
 
     if "error" in council:
         error_output = str(council["error"])
+        if council.get("stage"):
+            error_output += f"\nFailed stage: {council['stage']}"
+        partial = {key: council[key] for key in
+                   ('atlas', 'claude', 'grok', 'atlas_review', 'claude_review', 'grok_review')
+                   if key in council}
+        if partial:
+            error_output += "\n\nCompleted responses (incomplete Council):\n\n" + "\n\n".join(
+                f"{key.upper()}\n{answer}" for key, answer in partial.items())
+            try:
+                archive_result(question, "", request.project, council)
+            except OSError as error:
+                error_output += f"\n\nArchive failed: {error}"
+        last_final_answer = error_output
         project_response_cache[request.project]["COUNCIL"] = error_output
 
         if selected_mode == "COUNCIL" and selected_project == request.project:
@@ -429,7 +545,7 @@ GROK  ?  REVIEW
 
 
 root = tk.Tk()
-root.title("METIN AI LAB v0.2 - AI COUNCIL")
+root.title("METIN AI LAB v0.3 - GAME DEVELOPMENT COUNCIL")
 root.geometry("1280x900")
 root.minsize(640, 600)
 
@@ -440,19 +556,9 @@ except tk.TclError:
     pass
 root.configure(bg="#f4f7fb")
 
-# Smooth professional startup
+# Keep the WSLg visibility fix: start fully opaque, without a fade timer.
 try:
-    root.attributes("-alpha", 0.0)
-
-    def fade_in(alpha=0.0):
-        alpha += 0.08
-        if alpha >= 1.0:
-            root.attributes("-alpha", 1.0)
-            return
-        root.attributes("-alpha", alpha)
-        root.after(18, lambda: fade_in(alpha))
-
-    root.after(80, fade_in)
+    root.attributes("-alpha", 1.0)
 except tk.TclError:
     pass
 
@@ -485,7 +591,7 @@ motion_toggle.pack(side="right", anchor="n")
 
 title = tk.Label(
     header,
-    text="METIN AI LAB",
+    text="METIN AI LAB v0.3",
     font=("Segoe UI", 30, "bold"),
     fg="#0f2a4a",
     bg="#f4f7fb"
@@ -494,7 +600,7 @@ title.pack()
 
 subtitle = tk.Label(
     header,
-    text="v0.2  •  MULTI-AI COUNCIL",
+    text="v0.3  •  GAME DEVELOPMENT COUNCIL",
     font=("Arial", 11, "bold"),
     fg="#8ea0ba",
     bg="#f4f7fb"
@@ -518,6 +624,12 @@ def set_mode(mode):
             button.config(bg="#e8eef6", fg="#10233f")
 
     cached = response_cache.get(mode, "")
+    if mode == "TEACHER":
+        turns = teacher_histories.get(selected_project, [])
+        if turns:
+            cached = format_teacher_history(selected_project, turns)
+        if selected_project in history_errors:
+            cached = "WARNING: Teacher history could not be loaded/saved.\n" + history_errors[selected_project] + "\n\n" + cached
     if mode == "TEACHER" and not cached:
         try:
             with open("student_data.json", "r") as file:
@@ -621,11 +733,17 @@ def set_project(project):
     global selected_project, response_cache
 
     selected_project = project
+    project_var.set(project)
     response_cache = project_response_cache[selected_project]
 
     results.delete("1.0", tk.END)
 
     cached_response = response_cache.get(selected_mode, "")
+    if selected_mode == "TEACHER":
+        turns = teacher_histories.get(selected_project, [])
+        cached_response = format_teacher_history(selected_project, turns) if turns else ""
+        if selected_project in history_errors:
+            cached_response = "WARNING: Teacher history could not be loaded/saved.\n" + history_errors[selected_project] + "\n\n" + cached_response
 
     if cached_response:
         results.insert(tk.END, cached_response)
@@ -633,6 +751,10 @@ def set_project(project):
         results.insert(
             tk.END,
             f"{selected_project} / {selected_mode} ready. Ask a question."
+            + ("\n" + "\n".join(f"{p}: {r}" for p, r in ROLES.items())
+               + "\nLocal game evidence is sent to configured AI providers when you ask.\n"
+               "AI Council creates ideas → Human approves → Codex develops → Human tests."
+               if selected_project == GAME else "")
         )
 
 
@@ -907,6 +1029,14 @@ set_mode("COUNCIL")
 update_safety_ui()
 
 def close_app():
+    try:
+        for project, turns in teacher_histories.items():
+            if turns:
+                save_teacher_history(project, turns)
+    except (OSError, TeacherHistoryError) as error:
+        messagebox.showerror("Teacher not saved",
+            "The app will stay open. Use TEACHER > SAVE to export your lesson.\n\n" + str(error))
+        return
     atlas_visual.stop()
     requests.cancel()
     root.destroy()

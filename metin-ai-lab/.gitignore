@@ -20,3 +20,5 @@ student_data.json
 
 # Local application backup
 app_backup.py
+# Student database
+student_profiles.db
