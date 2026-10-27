@@ -248,6 +248,10 @@ def _run_council(question, project=None, *, progress=None, partial=None):
 
     # Capture evidence once, keeping all seven calls on the same project snapshot.
     contexts = {p: project_prompt(project, p, "") if project else "" for p in PROVIDERS}
+    review_contexts = {
+        p: contexts[p].split("Local evidence follows (may be truncated):", 1)[0]
+        for p in PROVIDERS
+    }
     atlas_answer = call("atlas", "ATLAS", contexts["ATLAS"] + question)
     claude_answer = call("claude", "CLAUDE", contexts["CLAUDE"] + question)
     grok_answer = call("grok", "GROK", contexts["GROK"] + question)
@@ -334,9 +338,13 @@ Identify:
 Be concise and practical.
 """
 
-    atlas_review = call("atlas_review", "ATLAS", contexts["ATLAS"] + atlas_review_prompt)
-    claude_review = call("claude_review", "CLAUDE", contexts["CLAUDE"] + claude_review_prompt)
-    grok_review = call("grok_review", "GROK", contexts["GROK"] + grok_review_prompt)
+    atlas_review = call("atlas_review", "ATLAS", review_contexts["ATLAS"] + atlas_review_prompt)
+
+    claude_review = call("claude_review", "CLAUDE", review_contexts["CLAUDE"] + claude_review_prompt)
+
+    grok_review = call("grok_review", "GROK", review_contexts["GROK"] + grok_review_prompt)
+
+
 
     # -----------------------------
     # ROUND 3 - FINAL JUDGE
@@ -373,7 +381,7 @@ Finish with:
 FINAL RECOMMENDATION
 """
 
-    final_answer = call("final", "ATLAS", contexts["ATLAS"] + judge_prompt)
+    final_answer = call("final", "ATLAS", review_contexts["ATLAS"] + judge_prompt)
 
     return {
         "atlas": atlas_answer,
